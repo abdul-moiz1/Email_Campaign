@@ -98,10 +98,13 @@ export default function Home() {
       >
         <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 relative">
           <div className="absolute top-4 right-4">
-            <Link href="/admin">
-              <a className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex items-center" title="Admin Dashboard" data-testid="link-admin">
-                <ShieldCheck className="w-5 h-5" />
-              </a>
+            <Link 
+              href="/admin"
+              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex items-center" 
+              title="Admin Dashboard" 
+              data-testid="link-admin"
+            >
+              <ShieldCheck className="w-5 h-5" />
             </Link>
           </div>
 

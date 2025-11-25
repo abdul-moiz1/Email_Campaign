@@ -61,6 +61,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all generated emails
+  app.get("/api/emails/generated", async (req, res) => {
+    try {
+      const emails = await storage.getAllGeneratedEmails();
+      res.json(emails);
+    } catch (error) {
+      console.error("Fetch generated emails error:", error);
+      res.status(500).json({ message: "Failed to fetch generated emails" });
+    }
+  });
+
   // Update submission status
   app.patch("/api/submissions/:id/status", async (req, res) => {
     try {

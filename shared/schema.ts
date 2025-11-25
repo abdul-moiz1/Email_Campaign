@@ -73,3 +73,20 @@ export const enrichedDataSchema = z.object({
 });
 
 export type EnrichedDataPayload = z.infer<typeof enrichedDataSchema>;
+
+// Generated Email schema (from Make.com AI)
+export interface GeneratedEmail {
+  id: string;
+  businessName: string;
+  address: string;
+  city: string;
+  province: string;
+  country: string;
+  email: string;
+  phone?: string;
+  website?: string;
+  emailSubject: string;
+  emailBody: string;
+  status: 'pending' | 'approved' | 'sent';
+  createdAt: Date;
+}
