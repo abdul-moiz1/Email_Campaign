@@ -1,0 +1,148 @@
+# Business Email Manager
+
+## Overview
+
+This is a full-stack web application built with React, Express, and Firebase that allows users to submit business information through an animated form and provides an admin dashboard to manage these submissions. The application uses a modern tech stack with TailwindCSS for styling, shadcn/ui components for the UI, and Firebase Firestore for data persistence.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+
+**Framework & Bundler**
+- React 18 with TypeScript for type safety
+- Vite as the build tool and development server
+- Client-side routing using Wouter (lightweight React Router alternative)
+
+**UI & Styling**
+- TailwindCSS v4 with custom design tokens for consistent theming
+- shadcn/ui component library (New York style variant) with Radix UI primitives
+- Framer Motion for animations (noted as removed in dependencies but still imported in pages)
+- Custom CSS animations using tw-animate-css
+- Responsive design with mobile-first approach
+
+**State Management**
+- TanStack Query (React Query) for server state management and caching
+- React Hook Form with Zod validation for form handling
+- Local component state with React hooks
+
+**Project Structure**
+- `/client/src/pages/` - Page components (Home, Admin, Success, NotFound)
+- `/client/src/components/ui/` - Reusable shadcn/ui components
+- `/client/src/hooks/` - Custom React hooks
+- `/client/src/lib/` - Utility functions and query client configuration
+
+### Backend Architecture
+
+**Server Framework**
+- Express.js with TypeScript running on Node.js
+- ESM modules (type: "module" in package.json)
+- Separate entry points for development and production builds
+
+**Development vs Production**
+- Development: Vite middleware integration with HMR support
+- Production: Static file serving from pre-built dist directory
+- esbuild for server-side bundling in production
+
+**API Design**
+- RESTful endpoints under `/api` prefix
+- JSON request/response format
+- Zod schema validation for request payloads
+- Error handling with appropriate HTTP status codes
+
+**API Endpoints**
+- `POST /api/submit` - Create new business submission
+- `GET /api/submissions` - Retrieve all submissions
+- `PATCH /api/submissions/:id/status` - Update submission status
+
+**Request/Response Logging**
+- Custom middleware for request timing and response logging
+- Filtered logging for API routes only (paths starting with `/api`)
+- JSON response capture for debugging
+
+### Data Storage Solutions
+
+**Firebase Firestore**
+- NoSQL document database for storing business submissions
+- Firebase Admin SDK for server-side operations
+- Collection: `submissions` with auto-generated document IDs
+
+**Data Models**
+- BusinessSubmission: Input form data (businessType, city, province, country)
+- Submission: Stored record with additional fields (id, status, timestamps)
+- Status enum: 'pending' | 'approved' | 'rejected' | 'contacted'
+
+**Storage Layer Pattern**
+- IStorage interface defining contract for data operations
+- FirestoreStorage implementation encapsulating Firestore logic
+- Easy to swap implementations if needed
+
+**Database Schema (Firestore)**
+```
+submissions/
+  {id}: {
+    businessType: string,
+    city: string,
+    province: string,
+    country: string,
+    status: 'pending' | 'approved' | 'rejected' | 'contacted',
+    createdAt: Timestamp,
+    updatedAt: Timestamp
+  }
+```
+
+**Configuration Note**
+- Despite Drizzle ORM being configured (drizzle.config.ts with PostgreSQL dialect), the application currently uses Firebase Firestore exclusively
+- The Drizzle setup appears to be boilerplate that isn't actively used
+
+### Authentication and Authorization
+
+**Current State**
+- No authentication mechanism is currently implemented
+- Admin dashboard is publicly accessible at `/admin` route
+- No user management or role-based access control
+
+**Security Considerations**
+- API endpoints are unprotected and can be accessed by anyone
+- Firebase Admin credentials are stored in environment variables (secure)
+- No CSRF protection or rate limiting implemented
+
+### External Dependencies
+
+**Firebase Services**
+- Firebase Admin SDK for server-side Firestore operations
+- Credentials managed via environment variables:
+  - `FIREBASE_PROJECT_ID`
+  - `FIREBASE_CLIENT_EMAIL`
+  - `FIREBASE_PRIVATE_KEY`
+
+**Database**
+- Neon Database serverless driver configured but not actively used
+- PostgreSQL connection string expected in `DATABASE_URL` environment variable
+- Drizzle ORM configured but implementation uses Firebase instead
+
+**UI Component Libraries**
+- Radix UI primitives (30+ component primitives for accessibility)
+- Lucide React icons for consistent iconography
+- cmdk for command palette components
+- Embla Carousel for carousel functionality
+
+**Form & Validation**
+- Zod for runtime schema validation
+- React Hook Form for form state management
+- @hookform/resolvers for Zod integration
+
+**Development Tools**
+- Replit-specific plugins:
+  - vite-plugin-runtime-error-modal for error overlays
+  - vite-plugin-cartographer for code navigation
+  - vite-plugin-dev-banner for development indicators
+- Custom vite-plugin-meta-images for OpenGraph image URL updates
+
+**Hosting Considerations**
+- Application designed to run on Replit platform
+- Meta image plugin updates OpenGraph tags with Replit deployment URLs
+- Environment detection via `REPL_ID` variable
