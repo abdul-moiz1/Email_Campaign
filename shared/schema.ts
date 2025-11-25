@@ -1,18 +1,28 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+// Business submission schema
+export const businessSubmissionSchema = z.object({
+  businessType: z.string().min(2, "Business type is required"),
+  city: z.string().min(2, "City is required"),
+  province: z.string().min(2, "Province/State is required"),
+  country: z.string().min(2, "Country is required"),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export type BusinessSubmission = z.infer<typeof businessSubmissionSchema>;
+
+// Email draft schema (stored in Firestore)
+export interface EmailDraft {
+  id: string;
+  businessName: string;
+  email: string;
+  body: string;
+  status: 'pending' | 'approved' | 'rejected' | 'sent';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const updateStatusSchema = z.object({
+  status: z.enum(['pending', 'approved', 'rejected', 'sent']),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type UpdateStatus = z.infer<typeof updateStatusSchema>;

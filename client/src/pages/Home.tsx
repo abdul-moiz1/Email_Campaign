@@ -31,18 +31,42 @@ export default function Home() {
 
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
-    // Simulate API call
-    console.log("Form Data Submitted:", data);
     
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    toast({
-      title: "Submission successful!",
-      description: "Redirecting you to the success page...",
-    });
-    
-    setIsSubmitting(false);
-    setLocation("/success");
+    try {
+      const response = await fetch("/api/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Submission failed");
+      }
+
+      const result = await response.json();
+      console.log("Submission result:", result);
+      
+      toast({
+        title: "Submission successful!",
+        description: "Your information has been saved to the database.",
+      });
+      
+      setTimeout(() => {
+        setLocation("/success");
+      }, 800);
+    } catch (error: any) {
+      console.error("Submission error:", error);
+      toast({
+        title: "Submission failed",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -56,7 +80,7 @@ export default function Home() {
         <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 relative">
           <div className="absolute top-4 right-4">
             <Link href="/admin">
-              <a className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex items-center" title="Admin Dashboard">
+              <a className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex items-center" title="Admin Dashboard" data-testid="link-admin">
                 <ShieldCheck className="w-5 h-5" />
               </a>
             </Link>

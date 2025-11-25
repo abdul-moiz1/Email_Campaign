@@ -1,45 +1,86 @@
 import { motion } from "framer-motion";
-import { Check, X, Mail, Building2, Clock, ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { Check, X, Mail, Building2, Clock, ArrowLeft, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock Data
-const INITIAL_DRAFTS = [
-  {
-    id: 1,
-    businessName: "Acme Corp",
-    email: "contact@acmecorp.com",
-    body: "Hello, we are interested in your enterprise tier services for our upcoming project launch in Q4.",
-    status: "pending",
-  },
-  {
-    id: 2,
-    businessName: "Zenith Design",
-    email: "hello@zenith.design",
-    body: "Looking to partner on the new UX research initiative. Please let us know your availability.",
-    status: "approved",
-  },
-  {
-    id: 3,
-    businessName: "Global Logistics",
-    email: "support@globallog.io",
-    body: "Inquiry regarding the API rate limits and custom integration support.",
-    status: "rejected",
-  },
-  {
-    id: 4,
-    businessName: "Starlight Coffee",
-    email: "manager@starlight.coffee",
-    body: "We'd like to order bulk beans for our 5 new locations opening next month.",
-    status: "pending",
-  },
-];
+interface EmailDraft {
+  id: string;
+  businessName: string;
+  email: string;
+  body: string;
+  status: 'pending' | 'approved' | 'rejected' | 'sent';
+  createdAt: string;
+  updatedAt: string;
+}
 
 export default function Admin() {
-  const [drafts, setDrafts] = useState(INITIAL_DRAFTS);
+  const [drafts, setDrafts] = useState<EmailDraft[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const handleStatusChange = (id: number, newStatus: string) => {
-    setDrafts(drafts.map(d => d.id === id ? { ...d, status: newStatus } : d));
+  const fetchDrafts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/drafts");
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch drafts");
+      }
+      
+      const data = await response.json();
+      setDrafts(data);
+    } catch (error: any) {
+      console.error("Fetch error:", error);
+      toast({
+        title: "Error loading drafts",
+        description: error.message || "Please check your Firebase configuration.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDrafts();
+  }, []);
+
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    setUpdating(id);
+    
+    try {
+      const response = await fetch(`/api/drafts/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update status");
+      }
+
+      const updated = await response.json();
+      
+      setDrafts(drafts.map(d => d.id === id ? updated : d));
+      
+      toast({
+        title: "Status updated",
+        description: `Email draft marked as ${newStatus}.`,
+      });
+    } catch (error: any) {
+      console.error("Update error:", error);
+      toast({
+        title: "Update failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(null);
+    }
   };
 
   return (
@@ -54,17 +95,35 @@ export default function Admin() {
             <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Admin Dashboard</h1>
             <p className="text-slate-500 text-lg">Review and manage email drafts</p>
           </div>
-          <Link href="/">
-            <a className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Form
-            </a>
-          </Link>
+          <div className="flex gap-2">
+            <button
+              onClick={fetchDrafts}
+              disabled={loading}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm disabled:opacity-50"
+              data-testid="button-refresh"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <Link href="/">
+              <a className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm" data-testid="link-back-form">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Form
+              </a>
+            </Link>
+          </div>
         </motion.div>
 
-        {drafts.length === 0 ? (
+        {loading && drafts.length === 0 ? (
+          <div className="text-center py-20">
+            <RefreshCw className="w-12 h-12 animate-spin text-slate-400 mx-auto mb-4" />
+            <p className="text-slate-500">Loading drafts...</p>
+          </div>
+        ) : drafts.length === 0 ? (
           <div className="text-center py-20 text-slate-400">
+            <Mail className="w-16 h-16 mx-auto mb-4 opacity-30" />
             <p className="text-xl">No drafts available</p>
+            <p className="text-sm mt-2">Submit a form to create your first email draft</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -88,10 +147,10 @@ export default function Admin() {
                   
                   <div className="flex items-center space-x-2 text-slate-400 mb-4 text-sm">
                     <Mail className="w-4 h-4" />
-                    <span>{draft.email}</span>
+                    <span className="truncate">{draft.email}</span>
                   </div>
 
-                  <div className="bg-slate-50 rounded-xl p-4 text-slate-600 text-sm leading-relaxed h-32 overflow-y-auto border border-slate-100 custom-scrollbar">
+                  <div className="bg-slate-50 rounded-xl p-4 text-slate-600 text-sm leading-relaxed h-32 overflow-y-auto border border-slate-100 custom-scrollbar whitespace-pre-wrap">
                     {draft.body}
                   </div>
                 </div>
@@ -99,7 +158,8 @@ export default function Admin() {
                 <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between gap-3">
                   <button
                     onClick={() => handleStatusChange(draft.id, "approved")}
-                    className="flex-1 flex items-center justify-center py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-all duration-200 shadow-sm group"
+                    disabled={updating === draft.id}
+                    className="flex-1 flex items-center justify-center py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-all duration-200 shadow-sm group disabled:opacity-50"
                     title="Approve"
                     data-testid={`btn-approve-${draft.id}`}
                   >
@@ -108,7 +168,8 @@ export default function Admin() {
                   </button>
                   <button
                     onClick={() => handleStatusChange(draft.id, "rejected")}
-                    className="flex-1 flex items-center justify-center py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-all duration-200 shadow-sm group"
+                    disabled={updating === draft.id}
+                    className="flex-1 flex items-center justify-center py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-all duration-200 shadow-sm group disabled:opacity-50"
                     title="Reject"
                     data-testid={`btn-reject-${draft.id}`}
                   >
@@ -146,7 +207,7 @@ function Badge({ status }: { status: string }) {
   const currentIcon = icons[status] || icons.pending;
 
   return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center capitalize ${currentStyle}`}>
+    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center capitalize ${currentStyle}`} data-testid={`badge-status-${status}`}>
       {currentIcon}
       {status}
     </span>
