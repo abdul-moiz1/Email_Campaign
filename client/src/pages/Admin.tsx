@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { Check, X, Mail, Building2, Clock } from "lucide-react";
+import { Check, X, Mail, Building2, Clock, ArrowLeft } from "lucide-react";
 import { useState } from "react";
+import { Link } from "wouter";
 
 // Mock Data
 const INITIAL_DRAFTS = [
@@ -47,10 +48,18 @@ export default function Admin() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-10 text-center md:text-left"
+          className="mb-10 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4"
         >
-          <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Admin Dashboard</h1>
-          <p className="text-slate-500 text-lg">Review and manage email drafts</p>
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Admin Dashboard</h1>
+            <p className="text-slate-500 text-lg">Review and manage email drafts</p>
+          </div>
+          <Link href="/">
+            <a className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Form
+            </a>
+          </Link>
         </motion.div>
 
         {drafts.length === 0 ? (
