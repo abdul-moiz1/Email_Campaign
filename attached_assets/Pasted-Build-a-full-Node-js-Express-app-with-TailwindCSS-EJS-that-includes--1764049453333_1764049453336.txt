@@ -1,0 +1,132 @@
+Build a full Node.js + Express app with TailwindCSS + EJS that includes:
+
+========================================
+1️⃣ Firebase Setup (Keys in .env)
+========================================
+- Create a firebase.js file
+- Read Firebase config from environment variables, NOT hardcoded
+  Use:
+    process.env.FIREBASE_API_KEY
+    process.env.FIREBASE_AUTH_DOMAIN
+    process.env.FIREBASE_PROJECT_ID
+    process.env.FIREBASE_STORAGE_BUCKET
+    process.env.FIREBASE_MESSAGING_ID
+    process.env.FIREBASE_APP_ID
+
+- Initialize Firebase v10+ inside firebase.js
+- Export Firestore db
+
+- Create a sample `.env.example` file with all Firebase variables (NO real keys)
+
+========================================
+2️⃣ Page 1 — Beautiful Animated Form
+========================================
+Route: GET "/"
+
+Design Requirements:
+- Use TailwindCSS
+- Background: soft gradient (blue/white)
+- Center a rounded-3xl card with shadow
+- Add fade-in animation on page load
+- The form should include:
+
+  * Business Type
+  * City
+  * Province / State
+  * Country
+
+Input Styles:
+- p-4
+- rounded-xl
+- soft gray border
+- focus:ring-2 ring-blue-400
+- smooth transitions
+
+Submit Button:
+- Full width
+- Blue gradient
+- White text, bold
+- Rounded-xl
+- Slight lift animation on hover (transform -translate-y-1)
+
+Form submits to POST "/submit".
+
+========================================
+3️⃣ Form Submission
+========================================
+Route: POST "/submit"
+- Just `console.log()` the submitted values for now
+- After submission, render a success page at "/success"
+
+========================================
+4️⃣ Page 2 — Admin Email Review Dashboard
+========================================
+Route: GET "/admin"
+
+Fetch documents from Firestore collection "emailDrafts".
+
+UI Requirements:
+- Light gray background
+- Centered title with fade-in
+- Display email drafts in a responsive grid
+- Each email draft card must include:
+  * Business Name
+  * Email
+  * Email body (inside scrollable div)
+  * Status badge (pending/approved/sent)
+  * Approve + Reject buttons with hover animation
+
+If no documents:
+Show "No drafts available" in a soft gray tone.
+
+========================================
+5️⃣ Express App Setup
+========================================
+- Use EJS template engine
+- Views folder for templates:
+    views/form.ejs
+    views/admin.ejs
+    views/success.ejs
+
+- public/css/style.css should contain Tailwind output
+
+Routes:
+  GET "/" → form page
+  POST "/submit" → console.log + success page
+  GET "/admin" → show Firestore email drafts
+
+========================================
+6️⃣ File Structure Required
+========================================
+project/
+  app.js
+  firebase.js
+  package.json
+  .env.example
+  tailwind.config.js
+  postcss.config.js
+  public/css/style.css
+  views/form.ejs
+  views/admin.ejs
+  views/success.ejs
+
+========================================
+7️⃣ Styling & Animation Requirements
+========================================
+- Add fade-in animations to form & cards
+- Add hover animation to buttons
+- Use Tailwind classes for modern SaaS UI
+- Everything must look clean, elegant, premium
+
+========================================
+8️⃣ Output
+========================================
+Generate:
+- Full code for all routes
+- EJS pages
+- Tailwind config
+- Firebase env connection
+- .env.example
+- Complete folder structure
+
+DO NOT skip anything.
