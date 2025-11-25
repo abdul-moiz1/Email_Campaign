@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Submission {
   id: string;
@@ -164,12 +165,20 @@ export default function Admin() {
           </div>
         </motion.div>
 
-        {/* Generated Emails Section */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Mail className="w-6 h-6 text-blue-600" />
-            AI-Generated Emails ({generatedEmails.length})
-          </h2>
+        <Tabs defaultValue="emails" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-admin">
+            <TabsTrigger value="emails" data-testid="tab-emails" className="flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              Emails ({generatedEmails.length})
+            </TabsTrigger>
+            <TabsTrigger value="submissions" data-testid="tab-submissions" className="flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Submissions ({submissions.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="emails" className="space-y-6">
+            <section>
           
           {loadingEmails && generatedEmails.length === 0 ? (
             <div className="text-center py-20">
@@ -244,14 +253,11 @@ export default function Admin() {
               ))}
             </div>
           )}
-        </section>
+            </section>
+          </TabsContent>
 
-        {/* Submissions Section */}
-        <section>
-          <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-blue-600" />
-            Business Submissions ({submissions.length})
-          </h2>
+          <TabsContent value="submissions" className="space-y-6">
+            <section>
 
         {loading && submissions.length === 0 ? (
           <div className="text-center py-20">
@@ -337,7 +343,9 @@ export default function Admin() {
             ))}
           </div>
         )}
-        </section>
+            </section>
+          </TabsContent>
+        </Tabs>
 
         {/* Email Review Modal */}
         <Dialog open={selectedEmail !== null} onOpenChange={() => setSelectedEmail(null)}>
