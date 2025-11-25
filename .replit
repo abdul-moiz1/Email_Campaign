@@ -41,3 +41,8 @@ waitForPort = 5000
 
 [agent]
 mockupState = "FULLSTACK"
+
+[userenv]
+
+[userenv.shared]
+MAKE_WEBHOOK_API_KEY = "b54f06b8a2135deb607d6f0064966a54e7a5c6b4cbcdfd9319a14653db21035d"

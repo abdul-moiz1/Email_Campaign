@@ -1,9 +1,26 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { initializeFirebase } from "./firebase";
-import { businessSubmissionSchema, updateStatusSchema } from "@shared/schema";
+import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+
+function validateApiKey(req: Request, res: Response, next: NextFunction) {
+  const apiKey = req.headers['x-make-apikey'];
+  const expectedApiKey = process.env.MAKE_WEBHOOK_API_KEY;
+
+  if (!expectedApiKey) {
+    console.error('MAKE_WEBHOOK_API_KEY not configured');
+    return res.status(500).json({ message: 'Server configuration error' });
+  }
+
+  if (!apiKey || apiKey !== expectedApiKey) {
+    console.warn('Invalid API key attempt');
+    return res.status(401).json({ message: 'Unauthorized: Invalid API key' });
+  }
+
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize Firebase before setting up routes
@@ -63,6 +80,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ message: error.message });
       } else {
         res.status(500).json({ message: "Failed to update status" });
+      }
+    }
+  });
+
+  // Webhook endpoint for Make to send enriched data
+  app.post("/api/webhook/enrich", validateApiKey, async (req, res) => {
+    try {
+      const parsed = enrichedDataSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        const error = fromZodError(parsed.error);
+        return res.status(400).json({ message: error.message });
+      }
+
+      const { submissionId, enrichedData } = parsed.data;
+      
+      console.log("Enriched data received for submission:", submissionId);
+      
+      const updated = await storage.updateEnrichedData(submissionId, enrichedData);
+      
+      res.json({ 
+        message: "Enriched data saved successfully",
+        submission: updated
+      });
+    } catch (error: any) {
+      console.error("Webhook enrich error:", error);
+      if (error.message === 'Submission not found') {
+        res.status(404).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: "Failed to save enriched data" });
       }
     }
   });

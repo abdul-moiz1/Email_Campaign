@@ -1,10 +1,11 @@
 import { getFirestore } from "./firebase";
-import type { BusinessSubmission, Submission, UpdateStatus } from "@shared/schema";
+import type { BusinessSubmission, Submission, UpdateStatus, EnrichedBusinessData } from "@shared/schema";
 
 export interface IStorage {
   createSubmission(submission: BusinessSubmission): Promise<Submission>;
   getAllSubmissions(): Promise<Submission[]>;
   updateSubmissionStatus(id: string, status: UpdateStatus): Promise<Submission>;
+  updateEnrichedData(id: string, enrichedData: EnrichedBusinessData): Promise<Submission>;
 }
 
 export class FirestoreStorage implements IStorage {
@@ -58,6 +59,30 @@ export class FirestoreStorage implements IStorage {
 
     await docRef.update({
       status,
+      updatedAt: new Date(),
+    });
+
+    const updated = await docRef.get();
+    const data = updated.data()!;
+
+    return {
+      id: updated.id,
+      ...data,
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || new Date(),
+    } as Submission;
+  }
+
+  async updateEnrichedData(id: string, enrichedData: EnrichedBusinessData): Promise<Submission> {
+    const docRef = this.db.collection('submissions').doc(id);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      throw new Error('Submission not found');
+    }
+
+    await docRef.update({
+      enrichedData,
       updatedAt: new Date(),
     });
 

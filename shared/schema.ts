@@ -20,6 +20,27 @@ export interface Submission {
   status: 'pending' | 'approved' | 'rejected' | 'contacted';
   createdAt: Date;
   updatedAt: Date;
+  enrichedData?: EnrichedBusinessData;
+}
+
+// Enriched data from Make AI agent
+export interface EnrichedBusinessData {
+  businessName?: string;
+  website?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  description?: string;
+  industry?: string;
+  employeeCount?: string;
+  revenue?: string;
+  socialMedia?: {
+    linkedin?: string;
+    facebook?: string;
+    twitter?: string;
+    instagram?: string;
+  };
+  otherDetails?: Record<string, any>;
 }
 
 export const updateStatusSchema = z.object({
@@ -27,3 +48,28 @@ export const updateStatusSchema = z.object({
 });
 
 export type UpdateStatus = z.infer<typeof updateStatusSchema>;
+
+// Schema for enriched data from Make webhook
+export const enrichedDataSchema = z.object({
+  submissionId: z.string().min(1, "Submission ID is required"),
+  enrichedData: z.object({
+    businessName: z.string().optional(),
+    website: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
+    address: z.string().optional(),
+    description: z.string().optional(),
+    industry: z.string().optional(),
+    employeeCount: z.string().optional(),
+    revenue: z.string().optional(),
+    socialMedia: z.object({
+      linkedin: z.string().optional(),
+      facebook: z.string().optional(),
+      twitter: z.string().optional(),
+      instagram: z.string().optional(),
+    }).optional(),
+    otherDetails: z.record(z.any()).optional(),
+  }),
+});
+
+export type EnrichedDataPayload = z.infer<typeof enrichedDataSchema>;
