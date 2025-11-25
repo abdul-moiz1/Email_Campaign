@@ -1,10 +1,10 @@
 import { getFirestore } from "./firebase";
-import type { BusinessSubmission, EmailDraft, UpdateStatus } from "@shared/schema";
+import type { BusinessSubmission, Submission, UpdateStatus } from "@shared/schema";
 
 export interface IStorage {
-  createEmailDraft(submission: BusinessSubmission): Promise<EmailDraft>;
-  getAllEmailDrafts(): Promise<EmailDraft[]>;
-  updateEmailDraftStatus(id: string, status: UpdateStatus): Promise<EmailDraft>;
+  createSubmission(submission: BusinessSubmission): Promise<Submission>;
+  getAllSubmissions(): Promise<Submission[]>;
+  updateSubmissionStatus(id: string, status: UpdateStatus): Promise<Submission>;
 }
 
 export class FirestoreStorage implements IStorage {
@@ -12,30 +12,31 @@ export class FirestoreStorage implements IStorage {
     return getFirestore();
   }
 
-  async createEmailDraft(submission: BusinessSubmission): Promise<EmailDraft> {
+  async createSubmission(submission: BusinessSubmission): Promise<Submission> {
     const now = new Date();
     
-    // Generate email draft content
-    const emailDraft = {
-      businessName: `${submission.businessType} in ${submission.city}`,
-      email: `contact@${submission.businessType.toLowerCase().replace(/\s+/g, '')}.com`,
-      body: `Hello,\n\nWe are a ${submission.businessType} based in ${submission.city}, ${submission.province}, ${submission.country}. We are interested in learning more about your services.\n\nBest regards,\n${submission.businessType} Team`,
+    // Store the exact form data submitted
+    const submissionData = {
+      businessType: submission.businessType,
+      city: submission.city,
+      province: submission.province,
+      country: submission.country,
       status: 'pending' as const,
       createdAt: now,
       updatedAt: now,
     };
 
-    const docRef = await this.db.collection('emailDrafts').add(emailDraft);
+    const docRef = await this.db.collection('submissions').add(submissionData);
     
     return {
       id: docRef.id,
-      ...emailDraft,
+      ...submissionData,
     };
   }
 
-  async getAllEmailDrafts(): Promise<EmailDraft[]> {
+  async getAllSubmissions(): Promise<Submission[]> {
     const snapshot = await this.db
-      .collection('emailDrafts')
+      .collection('submissions')
       .orderBy('createdAt', 'desc')
       .get();
 
@@ -44,15 +45,15 @@ export class FirestoreStorage implements IStorage {
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate() || new Date(),
       updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-    })) as EmailDraft[];
+    })) as Submission[];
   }
 
-  async updateEmailDraftStatus(id: string, { status }: UpdateStatus): Promise<EmailDraft> {
-    const docRef = this.db.collection('emailDrafts').doc(id);
+  async updateSubmissionStatus(id: string, { status }: UpdateStatus): Promise<Submission> {
+    const docRef = this.db.collection('submissions').doc(id);
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      throw new Error('Email draft not found');
+      throw new Error('Submission not found');
     }
 
     await docRef.update({
@@ -68,7 +69,7 @@ export class FirestoreStorage implements IStorage {
       ...data,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
-    } as EmailDraft;
+    } as Submission;
   }
 }
 

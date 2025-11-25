@@ -10,19 +10,20 @@ export const businessSubmissionSchema = z.object({
 
 export type BusinessSubmission = z.infer<typeof businessSubmissionSchema>;
 
-// Email draft schema (stored in Firestore)
-export interface EmailDraft {
+// Submission record (stored in Firestore)
+export interface Submission {
   id: string;
-  businessName: string;
-  email: string;
-  body: string;
-  status: 'pending' | 'approved' | 'rejected' | 'sent';
+  businessType: string;
+  city: string;
+  province: string;
+  country: string;
+  status: 'pending' | 'approved' | 'rejected' | 'contacted';
   createdAt: Date;
   updatedAt: Date;
 }
 
 export const updateStatusSchema = z.object({
-  status: z.enum(['pending', 'approved', 'rejected', 'sent']),
+  status: z.enum(['pending', 'approved', 'rejected', 'contacted']),
 });
 
 export type UpdateStatus = z.infer<typeof updateStatusSchema>;

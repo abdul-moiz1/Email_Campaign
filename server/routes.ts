@@ -9,7 +9,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize Firebase before setting up routes
   initializeFirebase();
 
-  // Submit business form
+  // Submit business inquiry form
   app.post("/api/submit", async (req, res) => {
     try {
       const parsed = businessSubmissionSchema.safeParse(req.body);
@@ -19,13 +19,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
 
-      console.log("Form Data Submitted:", parsed.data);
+      console.log("Business inquiry submitted:", parsed.data);
       
-      const emailDraft = await storage.createEmailDraft(parsed.data);
+      const submission = await storage.createSubmission(parsed.data);
       
       res.status(201).json({ 
         message: "Submission successful",
-        draft: emailDraft 
+        submission
       });
     } catch (error) {
       console.error("Submission error:", error);
@@ -33,19 +33,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all email drafts
-  app.get("/api/drafts", async (req, res) => {
+  // Get all submissions
+  app.get("/api/submissions", async (req, res) => {
     try {
-      const drafts = await storage.getAllEmailDrafts();
-      res.json(drafts);
+      const submissions = await storage.getAllSubmissions();
+      res.json(submissions);
     } catch (error) {
-      console.error("Fetch drafts error:", error);
-      res.status(500).json({ message: "Failed to fetch email drafts" });
+      console.error("Fetch submissions error:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
     }
   });
 
-  // Update email draft status
-  app.patch("/api/drafts/:id/status", async (req, res) => {
+  // Update submission status
+  app.patch("/api/submissions/:id/status", async (req, res) => {
     try {
       const { id } = req.params;
       const parsed = updateStatusSchema.safeParse(req.body);
@@ -55,11 +55,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
 
-      const updated = await storage.updateEmailDraftStatus(id, parsed.data);
+      const updated = await storage.updateSubmissionStatus(id, parsed.data);
       res.json(updated);
     } catch (error: any) {
       console.error("Update status error:", error);
-      if (error.message === 'Email draft not found') {
+      if (error.message === 'Submission not found') {
         res.status(404).json({ message: error.message });
       } else {
         res.status(500).json({ message: "Failed to update status" });
