@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
@@ -53,7 +53,15 @@ export default function Home() {
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="w-full max-w-md"
       >
-        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50">
+        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 relative">
+          <div className="absolute top-4 right-4">
+            <Link href="/admin">
+              <a className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors inline-flex items-center" title="Admin Dashboard">
+                <ShieldCheck className="w-5 h-5" />
+              </a>
+            </Link>
+          </div>
+
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-slate-900 mb-2 tracking-tight">Get Started</h1>
             <p className="text-slate-500">Tell us a bit about your business</p>
