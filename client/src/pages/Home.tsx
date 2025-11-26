@@ -49,25 +49,6 @@ export default function Home() {
       const result = await response.json();
       console.log("Submission result:", result);
       
-      const makeWebhookUrl = import.meta.env.VITE_MAKE_WEBHOOK_URL;
-      if (makeWebhookUrl) {
-        try {
-          await fetch(makeWebhookUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              ...data,
-              submissionId: result.submission.id,
-            }),
-          });
-          console.log("Data sent to Make webhook successfully");
-        } catch (makeError) {
-          console.error("Make webhook error:", makeError);
-        }
-      }
-      
       toast({
         title: "Submission successful!",
         description: "Your information has been saved and sent for processing.",

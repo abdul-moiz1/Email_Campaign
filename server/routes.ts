@@ -40,6 +40,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const submission = await storage.createSubmission(parsed.data);
       
+      // Send data to Make.com webhook
+      const makeWebhookUrl = process.env.VITE_MAKE_WEBHOOK_URL;
+      const makeApiKey = process.env.MAKE_WEBHOOK_API_KEY;
+      
+      if (makeWebhookUrl && makeApiKey) {
+        try {
+          const webhookResponse = await fetch(makeWebhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-make-apikey": makeApiKey,
+            },
+            body: JSON.stringify({
+              ...parsed.data,
+              submissionId: submission.id,
+            }),
+          });
+          
+          if (webhookResponse.ok) {
+            console.log("✓ Data sent to Make.com webhook successfully");
+          } else {
+            console.error("✗ Make.com webhook returned error:", webhookResponse.status, await webhookResponse.text());
+          }
+        } catch (makeError) {
+          console.error("✗ Make.com webhook error:", makeError);
+        }
+      } else {
+        console.warn("Make.com webhook not configured (missing URL or API key)");
+      }
+      
       res.status(201).json({ 
         message: "Submission successful",
         submission
