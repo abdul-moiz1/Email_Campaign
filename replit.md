@@ -54,9 +54,11 @@ Preferred communication style: Simple, everyday language.
 - Error handling with appropriate HTTP status codes
 
 **API Endpoints**
-- `POST /api/submit` - Create new business submission
+- `POST /api/submit` - Create new business submission, triggers Make.com webhook for AI enrichment
 - `GET /api/submissions` - Retrieve all submissions
 - `PATCH /api/submissions/:id/status` - Update submission status
+- `GET /api/emails` - Retrieve all AI-generated emails from Firestore
+- `POST /api/emails/send` - Send email via SendGrid to recipient
 
 **Request/Response Logging**
 - Custom middleware for request timing and response logging
@@ -92,6 +94,23 @@ submissions/
     createdAt: Timestamp,
     updatedAt: Timestamp
   }
+
+generated-emails/
+  {id}: {
+    businessType: string,
+    city: string,
+    province: string,
+    country: string,
+    businessName?: string,
+    email?: string,
+    phone?: string,
+    website?: string,
+    emailSubject: string,
+    emailBody: string,
+    status: 'draft' | 'sent',
+    createdAt: Timestamp,
+    updatedAt: Timestamp
+  }
 ```
 
 **Configuration Note**
@@ -118,6 +137,20 @@ submissions/
   - `FIREBASE_PROJECT_ID`
   - `FIREBASE_CLIENT_EMAIL`
   - `FIREBASE_PRIVATE_KEY`
+
+**SendGrid Integration**
+- SendGrid API for transactional email sending
+- Integrated via Replit connector blueprint (fresh credentials per call, no cached secrets)
+- API key managed through Replit integration system
+- Used for sending AI-generated emails from admin dashboard
+
+**Make.com Webhook Integration**
+- Webhook automation for AI-powered business data enrichment
+- Triggered on new business submissions
+- Generates personalized email content with enriched business information
+- Environment variables:
+  - `VITE_MAKE_WEBHOOK_URL` - Webhook endpoint URL
+  - `MAKE_WEBHOOK_API_KEY` - API key for webhook authentication
 
 **Database**
 - Neon Database serverless driver configured but not actively used
