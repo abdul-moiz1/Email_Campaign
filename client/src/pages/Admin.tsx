@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Globe, Mail, Phone, ExternalLink } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Globe, Mail, Phone, ExternalLink, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 interface Submission {
   id: string;
@@ -40,6 +41,8 @@ export default function Admin() {
   const [loadingEmails, setLoadingEmails] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<GeneratedEmail | null>(null);
+  const [sending, setSending] = useState(false);
+  const [showNoEmailAlert, setShowNoEmailAlert] = useState(false);
   const { toast } = useToast();
 
   const fetchSubmissions = async () => {
@@ -126,6 +129,62 @@ export default function Admin() {
       });
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedEmail) return;
+
+    // Check if recipient email exists
+    if (!selectedEmail.email || selectedEmail.email.trim() === '') {
+      setShowNoEmailAlert(true);
+      return;
+    }
+
+    setSending(true);
+    
+    try {
+      const response = await fetch("/api/emails/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          emailId: selectedEmail.id,
+          recipientEmail: selectedEmail.email,
+          subject: selectedEmail.emailSubject,
+          body: selectedEmail.emailBody,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to send email");
+      }
+
+      const result = await response.json();
+      
+      // Update local state to reflect sent status
+      setGeneratedEmails(generatedEmails.map(e => 
+        e.id === selectedEmail.id ? { ...e, status: 'sent' } : e
+      ));
+      
+      toast({
+        title: "Email sent successfully",
+        description: `Email sent to ${selectedEmail.email}`,
+      });
+      
+      // Close modal
+      setSelectedEmail(null);
+    } catch (error: any) {
+      console.error("Send email error:", error);
+      toast({
+        title: "Failed to send email",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -347,6 +406,21 @@ export default function Admin() {
           </TabsContent>
         </Tabs>
 
+        {/* No Email Alert Dialog */}
+        <AlertDialog open={showNoEmailAlert} onOpenChange={setShowNoEmailAlert}>
+          <AlertDialogContent data-testid="alert-no-email">
+            <AlertDialogHeader>
+              <AlertDialogTitle>No Recipient Email</AlertDialogTitle>
+              <AlertDialogDescription>
+                This email card does not have a recipient email address. Please add an email address before sending.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction data-testid="button-close-alert">OK</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Email Review Modal */}
         <Dialog open={selectedEmail !== null} onOpenChange={() => setSelectedEmail(null)}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -435,14 +509,27 @@ export default function Admin() {
                       Close
                     </button>
                     <button
-                      onClick={() => {
-                        window.open(`mailto:${selectedEmail.email}?subject=${encodeURIComponent(selectedEmail.emailSubject)}&body=${encodeURIComponent(selectedEmail.emailBody)}`, '_blank');
-                      }}
-                      className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      onClick={handleSendEmail}
+                      disabled={sending || selectedEmail?.status === 'sent'}
+                      className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="button-send-email"
                     >
-                      <Mail className="w-4 h-4" />
-                      Open in Email Client
+                      {sending ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : selectedEmail?.status === 'sent' ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Email Sent
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          Send Email
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
