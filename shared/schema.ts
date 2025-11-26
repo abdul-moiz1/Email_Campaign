@@ -79,14 +79,9 @@ export interface GeneratedEmail {
   id: string;
   businessName: string;
   address: string;
-  city: string;
-  province: string;
-  country: string;
-  email: string;
-  phone?: string;
-  website?: string;
-  emailSubject: string;
-  emailBody: string;
+  businessEmail: string;
+  aiEmail: string;
+  mapLink?: string;
   status: 'pending' | 'approved' | 'sent';
   createdAt: Date;
 }

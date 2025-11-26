@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Globe, Mail, Phone, ExternalLink, Send } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Globe, Mail, ExternalLink, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -22,14 +22,9 @@ interface GeneratedEmail {
   id: string;
   businessName: string;
   address: string;
-  city: string;
-  province: string;
-  country: string;
-  email: string;
-  phone?: string;
-  website?: string;
-  emailSubject: string;
-  emailBody: string;
+  businessEmail: string;
+  aiEmail: string;
+  mapLink?: string;
   status: 'pending' | 'approved' | 'sent';
   createdAt: string;
 }
@@ -136,7 +131,7 @@ export default function Admin() {
     if (!selectedEmail) return;
 
     // Check if recipient email exists
-    if (!selectedEmail.email || selectedEmail.email.trim() === '') {
+    if (!selectedEmail.businessEmail || selectedEmail.businessEmail.trim() === '') {
       setShowNoEmailAlert(true);
       return;
     }
@@ -151,9 +146,9 @@ export default function Admin() {
         },
         body: JSON.stringify({
           emailId: selectedEmail.id,
-          recipientEmail: selectedEmail.email,
-          subject: selectedEmail.emailSubject,
-          body: selectedEmail.emailBody,
+          recipientEmail: selectedEmail.businessEmail,
+          subject: "Personalized Business Opportunity",
+          body: selectedEmail.aiEmail,
         }),
       });
 
@@ -171,7 +166,7 @@ export default function Admin() {
       
       toast({
         title: "Email sent successfully",
-        description: `Email sent to ${selectedEmail.email}`,
+        description: `Email sent to ${selectedEmail.businessEmail}`,
       });
       
       // Close modal
@@ -275,19 +270,14 @@ export default function Admin() {
                       <div className="flex items-start space-x-2 text-slate-600">
                         <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                         <div className="text-sm">
-                          <div>{email.city}, {email.province}</div>
+                          <div>{email.address}</div>
                         </div>
                       </div>
-                      
-                      <div className="flex items-center space-x-2 text-slate-600">
-                        <Globe className="w-4 h-4 flex-shrink-0" />
-                        <span className="text-sm">{email.country}</span>
-                      </div>
 
-                      {email.email && (
+                      {email.businessEmail && (
                         <div className="flex items-center space-x-2 text-slate-600">
                           <Mail className="w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm truncate">{email.email}</span>
+                          <span className="text-sm truncate">{email.businessEmail}</span>
                         </div>
                       )}
 
@@ -434,6 +424,21 @@ export default function Admin() {
                 </DialogHeader>
                 
                 <div className="space-y-6 mt-4">
+                  {/* Email at the top */}
+                  {selectedEmail.businessEmail && (
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                        <div>
+                          <div className="text-xs text-blue-600 font-medium mb-1">Contact Email</div>
+                          <a href={`mailto:${selectedEmail.businessEmail}`} className="text-blue-700 hover:underline font-semibold text-lg" data-testid="link-email">
+                            {selectedEmail.businessEmail}
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Business Info */}
                   <div className="bg-slate-50 rounded-lg p-4 space-y-3">
                     <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -441,60 +446,31 @@ export default function Admin() {
                       {selectedEmail.businessName}
                     </h3>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div className="space-y-2">
                       <div className="flex items-start gap-2">
                         <MapPin className="w-4 h-4 mt-0.5 text-slate-500 flex-shrink-0" />
-                        <div>
-                          <div className="text-slate-600">{selectedEmail.address}</div>
-                          <div className="text-slate-500">{selectedEmail.city}, {selectedEmail.province}</div>
-                          <div className="text-slate-500">{selectedEmail.country}</div>
+                        <div className="text-slate-600 text-sm">
+                          {selectedEmail.address}
                         </div>
                       </div>
                       
-                      <div className="space-y-2">
-                        {selectedEmail.email && (
-                          <div className="flex items-center gap-2">
-                            <Mail className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                            <a href={`mailto:${selectedEmail.email}`} className="text-blue-600 hover:underline text-sm" data-testid="link-email">
-                              {selectedEmail.email}
-                            </a>
-                          </div>
-                        )}
-                        
-                        {selectedEmail.phone && (
-                          <div className="flex items-center gap-2">
-                            <Phone className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                            <a href={`tel:${selectedEmail.phone}`} className="text-blue-600 hover:underline text-sm" data-testid="link-phone">
-                              {selectedEmail.phone}
-                            </a>
-                          </div>
-                        )}
-                        
-                        {selectedEmail.website && (
-                          <div className="flex items-center gap-2">
-                            <ExternalLink className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                            <a href={selectedEmail.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm" data-testid="link-website">
-                              Visit Website
-                            </a>
-                          </div>
-                        )}
-                      </div>
+                      {selectedEmail.mapLink && (
+                        <div className="flex items-center gap-2">
+                          <ExternalLink className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                          <a href={selectedEmail.mapLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm" data-testid="link-map">
+                            View on Map
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Email Content */}
+                  {/* AI Generated Email Content */}
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-semibold text-slate-700 mb-1 block">Subject</label>
-                      <div className="bg-white border border-slate-200 rounded-lg p-3 text-slate-900" data-testid="text-email-subject">
-                        {selectedEmail.emailSubject}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 mb-1 block">Email Body</label>
+                      <label className="text-sm font-semibold text-slate-700 mb-1 block">AI Generated Email</label>
                       <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-700 whitespace-pre-wrap min-h-[200px]" data-testid="text-email-body">
-                        {selectedEmail.emailBody}
+                        {selectedEmail.aiEmail}
                       </div>
                     </div>
                   </div>

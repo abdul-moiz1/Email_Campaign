@@ -102,27 +102,24 @@ export class FirestoreStorage implements IStorage {
   async getAllGeneratedEmails(): Promise<GeneratedEmail[]> {
     const snapshot = await this.db
       .collection('generatedEmails')
-      .orderBy('createdAt', 'desc')
       .get();
 
-    return snapshot.docs.map(doc => {
+    const emails = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
-        businessName: data.businessName || '',
-        address: data.address || '',
-        city: data.city || '',
-        province: data.province || '',
-        country: data.country || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        website: data.website || '',
-        emailSubject: data.emailSubject || '',
-        emailBody: data.emailBody || '',
+        businessName: data.BusinessName || '',
+        address: data.Address || '',
+        businessEmail: data.BusinessEmail || '',
+        aiEmail: data.AIEmail || '',
+        mapLink: data.MapLink && data.MapLink.trim() !== '' ? data.MapLink : undefined,
         status: data.status || 'pending',
         createdAt: data.createdAt?.toDate() || new Date(),
       };
     }) as GeneratedEmail[];
+
+    // Sort by createdAt in memory
+    return emails.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async updateEmailStatus(emailId: string, status: 'pending' | 'approved' | 'sent'): Promise<void> {
