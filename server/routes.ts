@@ -44,36 +44,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const makeWebhookUrl = process.env.VITE_MAKE_WEBHOOK_URL;
       const makeApiKey = process.env.MAKE_WEBHOOK_API_KEY;
       
-      if (makeWebhookUrl && makeApiKey) {
-        try {
-          const webhookResponse = await fetch(makeWebhookUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-make-apikey": makeApiKey,
-            },
-            body: JSON.stringify({
-              ...parsed.data,
-              submissionId: submission.id,
-            }),
-          });
-          
-          if (webhookResponse.ok) {
-            console.log("✓ Data sent to Make.com webhook successfully");
-          } else {
-            console.error("✗ Make.com webhook returned error:", webhookResponse.status, await webhookResponse.text());
-          }
-        } catch (makeError) {
-          console.error("✗ Make.com webhook error:", makeError);
-        }
-      } else {
-        console.warn("Make.com webhook not configured (missing URL or API key)");
+      if (!makeWebhookUrl || !makeApiKey) {
+        console.error("Make.com webhook not configured (missing URL or API key)");
+        return res.status(500).json({ 
+          message: "Webhook configuration error. Please contact support."
+        });
       }
       
-      res.status(201).json({ 
-        message: "Submission successful",
-        submission
-      });
+      try {
+        const webhookResponse = await fetch(makeWebhookUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-make-apikey": makeApiKey,
+          },
+          body: JSON.stringify({
+            ...parsed.data,
+            submissionId: submission.id,
+          }),
+        });
+        
+        if (!webhookResponse.ok) {
+          const errorText = await webhookResponse.text();
+          console.error("✗ Make.com webhook returned error:", webhookResponse.status, errorText);
+          return res.status(502).json({ 
+            message: "Failed to send data to processing service. Please try again."
+          });
+        }
+        
+        console.log("✓ Data sent to Make.com webhook successfully");
+        
+        // Only send success response when webhook succeeds
+        return res.status(201).json({ 
+          message: "Submission successful",
+          submission
+        });
+      } catch (makeError) {
+        console.error("✗ Make.com webhook error:", makeError);
+        return res.status(502).json({ 
+          message: "Failed to connect to processing service. Please try again."
+        });
+      }
     } catch (error) {
       console.error("Submission error:", error);
       res.status(500).json({ message: "Failed to process submission" });
