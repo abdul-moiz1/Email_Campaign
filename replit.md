@@ -97,21 +97,20 @@ submissions/
 
 generated-emails/
   {id}: {
-    businessType: string,
-    city: string,
-    province: string,
-    country: string,
-    businessName?: string,
-    email?: string,
-    phone?: string,
-    website?: string,
-    emailSubject: string,
-    emailBody: string,
-    status: 'draft' | 'sent',
-    createdAt: Timestamp,
-    updatedAt: Timestamp
+    BusinessName: string,          // Capitalized field name
+    Address: string,                // Full address (e.g., "street, city, province postal, country")
+    BusinessEmail?: string,         // Capitalized field name
+    AIEmail: string,                // Capitalized field name - AI-generated email content
+    MapLink?: string,               // Capitalized field name - Google Maps link
+    // Note: No createdAt field - sorting done in-memory on client
   }
 ```
+
+**UI Display Notes**
+- Email cards show compact location format by parsing Address field: "City, Province, Country"
+- Address parser extracts the last 3 comma-separated segments with error handling
+- No status badges or action buttons displayed on cards (clean, read-only display)
+- Cards show: business name, location icon with compact address, business email (if available), and timestamp
 
 **Configuration Note**
 - Despite Drizzle ORM being configured (drizzle.config.ts with PostgreSQL dialect), the application currently uses Firebase Firestore exclusively
