@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Globe, Mail, ExternalLink, Send } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -258,19 +258,31 @@ export default function Admin() {
                   data-testid={`card-email-${email.id}`}
                 >
                   <div className="p-6 flex-1">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-2 text-blue-600">
-                        <Building2 className="w-5 h-5 flex-shrink-0" />
-                        <h3 className="font-semibold text-lg text-slate-900">{email.businessName}</h3>
-                      </div>
-                      <Badge status={email.status} />
+                    <div className="flex items-center space-x-2 text-blue-600 mb-4">
+                      <Building2 className="w-5 h-5 flex-shrink-0" />
+                      <h3 className="font-semibold text-lg text-slate-900">{email.businessName}</h3>
                     </div>
                     
                     <div className="space-y-3">
-                      <div className="flex items-start space-x-2 text-slate-600">
-                        <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <div className="flex items-center space-x-2 text-slate-600">
+                        <MapPin className="w-4 h-4 flex-shrink-0" />
                         <div className="text-sm">
-                          <div>{email.address}</div>
+                          {(() => {
+                            try {
+                              const parts = email.address.split(',').map(p => p.trim());
+                              if (parts.length >= 3) {
+                                // Extract city (third from end), province (second from end - first word), country (last)
+                                const country = parts[parts.length - 1];
+                                const provinceSection = parts[parts.length - 2].split(' ');
+                                const province = provinceSection[0]; // First word is usually province code
+                                const city = parts[parts.length - 3];
+                                return `${city}, ${province}, ${country}`;
+                              }
+                            } catch (e) {
+                              // Fallback to full address if parsing fails
+                            }
+                            return email.address;
+                          })()}
                         </div>
                       </div>
 
@@ -331,25 +343,17 @@ export default function Admin() {
                 data-testid={`card-submission-${submission.id}`}
               >
                 <div className="p-6 flex-1">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-2 text-blue-600">
-                      <Building2 className="w-5 h-5 flex-shrink-0" />
-                      <h3 className="font-semibold text-lg text-slate-900">{submission.businessType}</h3>
-                    </div>
-                    <Badge status={submission.status} />
+                  <div className="flex items-center space-x-2 text-blue-600 mb-4">
+                    <Building2 className="w-5 h-5 flex-shrink-0" />
+                    <h3 className="font-semibold text-lg text-slate-900">{submission.businessType}</h3>
                   </div>
                   
                   <div className="space-y-3">
-                    <div className="flex items-start space-x-2 text-slate-600">
-                      <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <div className="text-sm">
-                        <div>{submission.city}, {submission.province}</div>
-                      </div>
-                    </div>
-                    
                     <div className="flex items-center space-x-2 text-slate-600">
-                      <Globe className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm">{submission.country}</span>
+                      <MapPin className="w-4 h-4 flex-shrink-0" />
+                      <div className="text-sm">
+                        {submission.city}, {submission.province}, {submission.country}
+                      </div>
                     </div>
 
                     <div className="pt-3 border-t border-slate-100">
@@ -364,29 +368,6 @@ export default function Admin() {
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between gap-3">
-                  <button
-                    onClick={() => handleStatusChange(submission.id, "contacted")}
-                    disabled={updating === submission.id}
-                    className="flex-1 flex items-center justify-center py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-all duration-200 shadow-sm group disabled:opacity-50"
-                    title="Mark as Contacted"
-                    data-testid={`btn-contacted-${submission.id}`}
-                  >
-                    <Check className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                    Contacted
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(submission.id, "rejected")}
-                    disabled={updating === submission.id}
-                    className="flex-1 flex items-center justify-center py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-all duration-200 shadow-sm group disabled:opacity-50"
-                    title="Reject"
-                    data-testid={`btn-reject-${submission.id}`}
-                  >
-                    <X className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                    Reject
-                  </button>
                 </div>
               </motion.div>
             ))}
