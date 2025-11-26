@@ -49,6 +49,7 @@ waitForPort = 5000
 [agent]
 mockupState = "FULLSTACK"
 expertMode = true
+integrations = ["sendgrid:1.0.0"]
 
 [userenv]
 

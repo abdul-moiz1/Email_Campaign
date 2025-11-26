@@ -90,3 +90,13 @@ export interface GeneratedEmail {
   status: 'pending' | 'approved' | 'sent';
   createdAt: Date;
 }
+
+// Send Email schema
+export const sendEmailSchema = z.object({
+  emailId: z.string().min(1, "Email ID is required"),
+  recipientEmail: z.string().email("Valid email address is required"),
+  subject: z.string().min(1, "Subject is required"),
+  body: z.string().min(1, "Email body is required"),
+});
+
+export type SendEmail = z.infer<typeof sendEmailSchema>;

@@ -2,8 +2,9 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { initializeFirebase } from "./firebase";
-import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema } from "@shared/schema";
+import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema, sendEmailSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import { getUncachableSendGridClient } from "./sendgrid";
 
 function validateApiKey(req: Request, res: Response, next: NextFunction) {
   const apiKey = req.headers['x-make-apikey'];
@@ -162,6 +163,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(404).json({ message: error.message });
       } else {
         res.status(500).json({ message: "Failed to save enriched data" });
+      }
+    }
+  });
+
+  // Send email via SendGrid
+  app.post("/api/emails/send", async (req, res) => {
+    try {
+      const parsed = sendEmailSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        const error = fromZodError(parsed.error);
+        return res.status(400).json({ message: error.message });
+      }
+
+      const { emailId, recipientEmail, subject, body } = parsed.data;
+      
+      console.log(`Sending email to ${recipientEmail} for email ID: ${emailId}`);
+      
+      // Get SendGrid client
+      const { client, fromEmail } = await getUncachableSendGridClient();
+      
+      // Send email
+      await client.send({
+        to: recipientEmail,
+        from: fromEmail,
+        subject: subject,
+        text: body,
+        html: body.replace(/\n/g, '<br>'),
+      });
+      
+      console.log(`✓ Email sent successfully to ${recipientEmail}`);
+      
+      // Update email status to 'sent'
+      await storage.updateEmailStatus(emailId, 'sent');
+      
+      res.json({ 
+        message: "Email sent successfully",
+        recipient: recipientEmail
+      });
+    } catch (error: any) {
+      console.error("Send email error:", error);
+      if (error.message === 'Email not found') {
+        res.status(404).json({ message: error.message });
+      } else if (error.message === 'SendGrid not connected') {
+        res.status(500).json({ message: "SendGrid is not configured. Please set up the integration." });
+      } else {
+        res.status(500).json({ 
+          message: "Failed to send email",
+          error: error.message 
+        });
       }
     }
   });

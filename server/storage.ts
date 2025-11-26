@@ -7,6 +7,7 @@ export interface IStorage {
   updateSubmissionStatus(id: string, status: UpdateStatus): Promise<Submission>;
   updateEnrichedData(id: string, enrichedData: EnrichedBusinessData): Promise<Submission>;
   getAllGeneratedEmails(): Promise<GeneratedEmail[]>;
+  updateEmailStatus(emailId: string, status: 'pending' | 'approved' | 'sent'): Promise<void>;
 }
 
 export class FirestoreStorage implements IStorage {
@@ -206,6 +207,23 @@ export class FirestoreStorage implements IStorage {
     // Extract country from address (usually last part)
     const parts = address.split(',').map(p => p.trim());
     return parts[parts.length - 1] || '';
+  }
+
+  async updateEmailStatus(emailId: string, status: 'pending' | 'approved' | 'sent'): Promise<void> {
+    // Extract the base document ID (remove the _index suffix if present)
+    const baseId = emailId.split('_')[0];
+    
+    const docRef = this.db.collection('generatedEmails').doc(baseId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      throw new Error('Email not found');
+    }
+
+    await docRef.update({
+      status,
+      updatedAt: new Date(),
+    });
   }
 }
 
