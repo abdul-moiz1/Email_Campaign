@@ -16,10 +16,6 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 40555
-externalPort = 3000
-
-[[ports]]
 localPort = 45071
 externalPort = 3001
 
@@ -57,5 +53,5 @@ expertMode = true
 [userenv]
 
 [userenv.shared]
-MAKE_WEBHOOK_API_KEY = "8e281fcd1dc55135e6044df0c683cb3a991ce6f7ed155a9e835b265e494aaf0b"
-VITE_MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/zq2ec43xc1te1qqj5ar5ne844yg9lg2b"
+MAKE_WEBHOOK_API_KEY = "My-Webhook-API-2025"
+VITE_MAKE_WEBHOOK_URL = "https://hook.eu1.make.com/s3s3ukjizi1xxxk16tiy88qq99nsohn0"
