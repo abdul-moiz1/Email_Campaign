@@ -137,6 +137,17 @@ export default function Admin() {
     fetchSubmissions();
   }, []);
 
+  // Initialize edited fields when selectedCampaign changes
+  useEffect(() => {
+    if (selectedCampaign?.hasEmail && selectedCampaign?.email) {
+      setEditedSubject(selectedCampaign.email.editedSubject || selectedCampaign.email.subject || "");
+      setEditedBody(selectedCampaign.email.editedBody || selectedCampaign.email.aiEmail || "");
+    } else if (selectedCampaign) {
+      setEditedSubject("");
+      setEditedBody("");
+    }
+  }, [selectedCampaign]);
+
   const getSelectedProduct = (campaignId: string): string => {
     const selected = selectedProducts[campaignId];
     if (selected === 'custom') {
@@ -467,6 +478,22 @@ export default function Admin() {
                         </div>
                       )}
 
+                      {campaign.mapLink && (
+                        <div className="flex items-center space-x-2 text-slate-600">
+                          <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                          <a 
+                            href={campaign.mapLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-sm text-blue-600 hover:underline truncate"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`link-map-${campaign.id}`}
+                          >
+                            View on Map
+                          </a>
+                        </div>
+                      )}
+
                       <div className="pt-3 border-t border-slate-100">
                         <div className="text-xs text-slate-400">
                           Added {new Date(campaign.createdAt).toLocaleDateString('en-US', { 
@@ -708,24 +735,133 @@ export default function Admin() {
                   </div>
 
                   {selectedCampaign.hasEmail && selectedCampaign.email ? (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-slate-700">Email Status</span>
                         {getEmailStatusBadge(selectedCampaign.email.status)}
                       </div>
-                      <Button
-                        onClick={() => {
-                          if (selectedCampaign.email) {
-                            openEmailModal(selectedCampaign.email);
-                            setSelectedCampaign(null);
-                          }
-                        }}
-                        className="w-full"
-                        data-testid="button-modal-view-email"
-                      >
-                        <Mail className="w-4 h-4 mr-2" />
-                        View / Edit Email
-                      </Button>
+                      
+                      <div className="space-y-4 border-t border-slate-200 pt-4">
+                        <div>
+                          <label className="text-sm font-semibold text-slate-700 mb-2 block">Email Subject</label>
+                          <Input
+                            value={editedSubject}
+                            onChange={(e) => setEditedSubject(e.target.value)}
+                            placeholder="Enter email subject..."
+                            className="w-full"
+                            data-testid="campaign-input-email-subject"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="text-sm font-semibold text-slate-700 mb-2 block">AI Generated Email</label>
+                          <Textarea
+                            value={editedBody}
+                            onChange={(e) => setEditedBody(e.target.value)}
+                            placeholder="AI generated email content..."
+                            className="w-full min-h-[200px] resize-none"
+                            data-testid="campaign-input-email-body"
+                          />
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={async () => {
+                              if (selectedCampaign.email) {
+                                const emailId = selectedCampaign.email.id;
+                                const currentSubject = editedSubject;
+                                const currentBody = editedBody;
+                                
+                                setSaving(true);
+                                try {
+                                  const response = await fetch(`/api/emails/${emailId}/update`, {
+                                    method: "PATCH",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({
+                                      subject: currentSubject,
+                                      body: currentBody,
+                                    }),
+                                  });
+
+                                  if (!response.ok) {
+                                    const error = await response.json();
+                                    throw new Error(error.message || "Failed to save email");
+                                  }
+
+                                  const result = await response.json();
+                                  
+                                  // Update campaigns list with fresh data
+                                  setCampaigns(prev => prev.map(c => 
+                                    c.email?.id === emailId 
+                                      ? { ...c, email: result.email }
+                                      : c
+                                  ));
+                                  
+                                  // Update selectedCampaign with fresh email data
+                                  setSelectedCampaign(prev => prev ? {
+                                    ...prev,
+                                    email: result.email
+                                  } : null);
+                                  
+                                  // Also set selectedEmail so Send Email flow works
+                                  setSelectedEmail(result.email);
+                                  
+                                  toast({
+                                    title: "Email saved",
+                                    description: "Your changes have been saved.",
+                                  });
+                                } catch (error: any) {
+                                  console.error("Save error:", error);
+                                  toast({
+                                    title: "Save failed",
+                                    description: error.message || "Please try again.",
+                                    variant: "destructive",
+                                  });
+                                } finally {
+                                  setSaving(false);
+                                }
+                              }
+                            }}
+                            disabled={saving || !editedSubject || !editedBody}
+                            variant="secondary"
+                            className="flex-1"
+                            data-testid="campaign-button-save-email"
+                          >
+                            {saving ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Changes
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              if (selectedCampaign.email) {
+                                // Create updated email with current edited values
+                                const updatedEmail = {
+                                  ...selectedCampaign.email,
+                                  editedSubject: editedSubject,
+                                  editedBody: editedBody,
+                                };
+                                openEmailModal(updatedEmail);
+                                setSelectedCampaign(null);
+                              }
+                            }}
+                            className="flex-1"
+                            data-testid="campaign-button-send-email"
+                          >
+                            <Send className="w-4 h-4 mr-2" />
+                            Send Email
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
