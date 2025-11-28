@@ -605,15 +605,40 @@ export default function Admin() {
   }, [campaigns, selectedCampaignIds]);
 
   const getEmailBadge = (campaign: CampaignWithEmail) => {
-    const hasEmailContent = campaign.hasEmail && campaign.email && campaign.email.aiEmail && campaign.email.aiEmail.trim() !== '';
-    if (hasEmailContent) {
+    const validStatuses: EmailStatus[] = ['not_generated', 'generated', 'edited', 'sent'];
+    
+    if (campaign.email && campaign.email.status && validStatuses.includes(campaign.email.status)) {
+      const status = campaign.email.status;
+      
+      const styles: Record<EmailStatus, string> = {
+        not_generated: "bg-slate-100 text-slate-600 border-slate-200",
+        generated: "bg-blue-100 text-blue-700 border-blue-200",
+        edited: "bg-amber-100 text-amber-700 border-amber-200",
+        sent: "bg-green-100 text-green-700 border-green-200",
+      };
+
+      const labels: Record<EmailStatus, string> = {
+        not_generated: "Not Generated",
+        generated: "Generated",
+        edited: "Edited",
+        sent: "Sent",
+      };
+
+      const icons: Record<EmailStatus, React.ReactNode> = {
+        not_generated: <Clock className="w-3 h-3 mr-1" />,
+        generated: <Sparkles className="w-3 h-3 mr-1" />,
+        edited: <Save className="w-3 h-3 mr-1" />,
+        sent: <Check className="w-3 h-3 mr-1" />,
+      };
+
       return (
-        <Badge variant="default" className="bg-green-100 text-green-700 border-green-200 flex-shrink-0" data-testid="badge-email">
-          <Mail className="w-3 h-3 mr-1" />
-          Email
+        <Badge variant="default" className={`${styles[status]} flex-shrink-0`} data-testid={`badge-${status}`}>
+          {icons[status]}
+          {labels[status]}
         </Badge>
       );
     }
+    
     return (
       <Badge variant="secondary" className="flex-shrink-0" data-testid="badge-no-email">
         No Email
