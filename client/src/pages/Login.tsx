@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
-import { Mail, Lock, LogIn, Eye, EyeOff, AlertCircle, RefreshCw } from "lucide-react";
+import { Mail, Lock, LogIn, Eye, EyeOff, AlertCircle, RefreshCw, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,6 +183,18 @@ export default function Login() {
         <p className="text-center text-sm text-slate-500 mt-4">
           Protected admin area
         </p>
+        
+        <div className="text-center mt-6">
+          <p className="text-sm text-slate-600 mb-2">
+            Not an admin? Apply for our services
+          </p>
+          <Link href="/">
+            <Button variant="outline" className="gap-2" data-testid="button-go-to-form">
+              Go to Application Form
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </Link>
+        </div>
       </motion.div>
     </div>
   );
