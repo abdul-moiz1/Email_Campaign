@@ -151,7 +151,7 @@ export type GenerateEmail = z.infer<typeof generateEmailSchema>;
 
 // Update Email schema (for saving edits)
 export const updateEmailSchema = z.object({
-  subject: z.string().min(1, "Subject is required"),
+  subject: z.string().optional().default(""),
   body: z.string().min(1, "Email body is required"),
 });
 

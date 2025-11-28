@@ -430,58 +430,65 @@ export default function Admin() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-10">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-10 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-4"
+          className="mb-8"
         >
-          <div>
-            <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Admin Dashboard</h1>
-            <p className="text-slate-500 text-lg">Manage campaigns and AI-generated emails</p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              onClick={() => {
-                fetchCampaigns();
-                fetchSubmissions();
-              }}
-              disabled={loading || loadingSubmissions}
-              variant="outline"
-              data-testid="button-refresh"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${(loading || loadingSubmissions) ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/" data-testid="link-back-form">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Form
-              </Link>
-            </Button>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Dashboard</h1>
+              <p className="text-slate-500 mt-1">Manage campaigns and AI-generated emails</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  fetchCampaigns();
+                  fetchSubmissions();
+                }}
+                disabled={loading || loadingSubmissions}
+                variant="outline"
+                size="sm"
+                data-testid="button-refresh"
+              >
+                <RefreshCw className={`w-4 h-4 ${(loading || loadingSubmissions) ? 'animate-spin' : ''}`} />
+                <span className="ml-2 hidden sm:inline">Refresh</span>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/" data-testid="link-back-form">
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="ml-2 hidden sm:inline">Back</span>
+                </Link>
+              </Button>
+            </div>
           </div>
         </motion.div>
 
-        <Tabs defaultValue="campaigns" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-admin">
-            <TabsTrigger value="campaigns" data-testid="tab-campaigns" className="flex items-center gap-2">
-              <Building2 className="w-4 h-4" />
-              Campaigns ({campaigns.length})
-            </TabsTrigger>
-            <TabsTrigger value="submissions" data-testid="tab-submissions" className="flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Submissions ({submissions.length})
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="campaigns" className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200">
+            <TabsList data-testid="tabs-admin">
+              <TabsTrigger value="campaigns" data-testid="tab-campaigns" className="gap-2">
+                <Building2 className="w-4 h-4" />
+                <span>Campaigns</span>
+                <Badge variant="secondary" className="ml-1">{campaigns.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="submissions" data-testid="tab-submissions" className="gap-2">
+                <Mail className="w-4 h-4" />
+                <span>Submissions</span>
+                <Badge variant="secondary" className="ml-1">{submissions.length}</Badge>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <TabsContent value="campaigns" className="space-y-6">
-            <section>
-              <div className="flex flex-col sm:flex-row gap-4 mb-6 items-start sm:items-center justify-between">
-                <div className="flex gap-2 flex-wrap items-center">
+          <TabsContent value="campaigns" className="space-y-4 mt-0">
+            <div className="bg-white rounded-lg border border-slate-200 p-4">
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                <div className="flex items-center gap-3 flex-wrap">
                   <Select value={filterMode} onValueChange={(value: FilterMode) => setFilterMode(value)}>
-                    <SelectTrigger className="w-[160px]" data-testid="select-filter-mode">
-                      <Filter className="w-4 h-4 mr-2" />
+                    <SelectTrigger className="w-[150px]" data-testid="select-filter-mode">
+                      <Filter className="w-4 h-4 mr-2 text-slate-500" />
                       <SelectValue placeholder="Filter" />
                     </SelectTrigger>
                     <SelectContent>
@@ -491,37 +498,38 @@ export default function Admin() {
                     </SelectContent>
                   </Select>
                   <span className="text-sm text-slate-500">
-                    Showing {filteredCampaigns.length} of {campaigns.length}
+                    {filteredCampaigns.length} of {campaigns.length}
                   </span>
                 </div>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
                   <Button
                     onClick={handleSelectAll}
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     disabled={filteredCampaigns.length === 0}
                     data-testid="button-select-all"
                   >
-                    <CheckSquare className="w-4 h-4 mr-2" />
-                    Select All ({filteredCampaigns.length})
+                    <CheckSquare className="w-4 h-4 mr-1" />
+                    All
                   </Button>
                   <Button
                     onClick={handleDeselectAll}
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     disabled={selectedCampaignIds.size === 0}
                     data-testid="button-deselect-all"
                   >
-                    <Square className="w-4 h-4 mr-2" />
-                    Deselect All
+                    <Square className="w-4 h-4 mr-1" />
+                    None
                   </Button>
                   {selectedCampaignIds.size > 0 && (
-                    <span className="text-sm text-slate-500 self-center">
+                    <Badge variant="outline" className="text-slate-600">
                       {selectedCampaignIds.size} selected
-                    </span>
+                    </Badge>
                   )}
                 </div>
               </div>
+            </div>
           
           {loading && campaigns.length === 0 ? (
             <div className="text-center py-20">
@@ -529,26 +537,26 @@ export default function Admin() {
               <p className="text-slate-500">Loading campaigns...</p>
             </div>
           ) : filteredCampaigns.length === 0 ? (
-            <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-100">
-              <Building2 className="w-16 h-16 mx-auto mb-4 opacity-30" />
-              <p className="text-xl">{campaigns.length === 0 ? 'No campaigns found' : 'No campaigns match the filter'}</p>
-              <p className="text-sm mt-2">{campaigns.length === 0 ? 'Campaign data will appear here from the CampaignData collection' : 'Try changing the filter'}</p>
+            <div className="text-center py-16 bg-white rounded-lg border border-slate-200">
+              <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+              <p className="text-lg text-slate-500">{campaigns.length === 0 ? 'No campaigns found' : 'No campaigns match the filter'}</p>
+              <p className="text-sm text-slate-400 mt-1">{campaigns.length === 0 ? 'Campaign data will appear here' : 'Try changing the filter'}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {filteredCampaigns.map((campaign, index) => (
                 <motion.div
                   key={campaign.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border flex flex-col cursor-pointer ${selectedCampaignIds.has(campaign.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-100'}`}
+                  transition={{ delay: index * 0.03 }}
+                  className={`bg-white rounded-lg border transition-all duration-200 flex flex-col cursor-pointer hover:border-slate-300 ${selectedCampaignIds.has(campaign.id) ? 'border-blue-500 ring-1 ring-blue-100' : 'border-slate-200'}`}
                   onClick={() => setSelectedCampaign(campaign)}
                   data-testid={`card-campaign-${campaign.id}`}
                 >
-                  <div className="p-6 flex-1">
-                    <div className="flex items-start justify-between mb-4 gap-2">
-                      <div className="flex items-center space-x-2 min-w-0">
+                  <div className="p-4 flex-1">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <div 
                           onClick={(e) => { e.stopPropagation(); toggleCampaignSelection(campaign.id); }}
                           className="flex-shrink-0"
@@ -558,189 +566,152 @@ export default function Admin() {
                             data-testid={`checkbox-campaign-${campaign.id}`}
                           />
                         </div>
-                        <Building2 className="w-5 h-5 flex-shrink-0 text-blue-600" />
-                        <h3 className="font-semibold text-lg text-slate-900 truncate">{campaign.businessName}</h3>
+                        <h3 className="font-medium text-slate-900 truncate">{campaign.businessName}</h3>
                       </div>
                       {getEmailBadge(campaign)}
                     </div>
                     
-                    <div className="space-y-3">
+                    <div className="space-y-2 text-sm">
                       {campaign.address && (
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          <MapPin className="w-4 h-4 flex-shrink-0" />
-                          <div className="text-sm truncate">
-                            {extractCityCountry(campaign.address)}
-                          </div>
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="truncate">{extractCityCountry(campaign.address)}</span>
                         </div>
                       )}
 
                       {campaign.businessEmail && (
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          <Mail className="w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm truncate">{campaign.businessEmail}</span>
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="truncate">{campaign.businessEmail}</span>
                         </div>
                       )}
 
                       {campaign.phone && (
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          <Phone className="w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm">{campaign.phone}</span>
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>{campaign.phone}</span>
                         </div>
                       )}
-
-                      <div className="pt-3 border-t border-slate-100">
-                        <div className="text-xs text-slate-400">
-                          Added {new Date(campaign.createdAt).toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric', 
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </div>
                     </div>
+                  </div>
 
-                    <div className="mt-4 space-y-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="space-y-2">
-                        <Select 
-                          value={selectedProducts[campaign.id] || campaign.email?.selectedProduct || ""} 
-                          onValueChange={(value) => {
-                            setSelectedProducts({...selectedProducts, [campaign.id]: value});
-                            if (value === 'custom') {
-                              setShowCustomInput({...showCustomInput, [campaign.id]: true});
-                            } else {
-                              setShowCustomInput({...showCustomInput, [campaign.id]: false});
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="w-full" data-testid={`select-product-${campaign.id}`}>
-                            <SelectValue placeholder="Select Product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {productTypes.map((product) => (
-                              <SelectItem key={product} value={product}>
-                                {product}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="custom">
-                              <span className="flex items-center gap-1">
-                                <Plus className="w-3 h-3" />
-                                Custom Product...
-                              </span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                  <div className="p-4 pt-0 space-y-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                    <Select 
+                      value={selectedProducts[campaign.id] || campaign.email?.selectedProduct || ""} 
+                      onValueChange={(value) => {
+                        setSelectedProducts({...selectedProducts, [campaign.id]: value});
+                        setShowCustomInput({...showCustomInput, [campaign.id]: value === 'custom'});
+                      }}
+                    >
+                      <SelectTrigger className="w-full" data-testid={`select-product-${campaign.id}`}>
+                        <SelectValue placeholder="Select Product" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {productTypes.map((product) => (
+                          <SelectItem key={product} value={product}>
+                            {product}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">
+                          <span className="flex items-center gap-1">
+                            <Plus className="w-3 h-3" />
+                            Custom...
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                        {showCustomInput[campaign.id] && (
-                          <Input
-                            placeholder="Enter custom product name..."
-                            value={customProducts[campaign.id] || ''}
-                            onChange={(e) => setCustomProducts({...customProducts, [campaign.id]: e.target.value})}
-                            data-testid={`input-custom-product-${campaign.id}`}
-                          />
-                        )}
-                      </div>
+                    {showCustomInput[campaign.id] && (
+                      <Input
+                        placeholder="Enter custom product..."
+                        value={customProducts[campaign.id] || ''}
+                        onChange={(e) => setCustomProducts({...customProducts, [campaign.id]: e.target.value})}
+                        data-testid={`input-custom-product-${campaign.id}`}
+                      />
+                    )}
 
-                      <div className="flex gap-2">
-                        {campaign.hasEmail && hasEmailContent(campaign.email) ? (
-                          <Button
-                            onClick={(e) => { e.stopPropagation(); campaign.email && openEmailModal(campaign.email); }}
-                            className="flex-1"
-                            variant="default"
-                            data-testid={`button-view-email-${campaign.id}`}
-                          >
-                            <Mail className="w-4 h-4 mr-2" />
-                            View / Edit Email
-                          </Button>
+                    {campaign.hasEmail && hasEmailContent(campaign.email) ? (
+                      <Button
+                        onClick={(e) => { e.stopPropagation(); campaign.email && openEmailModal(campaign.email); }}
+                        className="w-full"
+                        size="sm"
+                        data-testid={`button-view-email-${campaign.id}`}
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        View Email
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={(e) => { e.stopPropagation(); handleGenerateEmail(campaign); }}
+                        disabled={generating === campaign.id || isGenerateDisabled(campaign.id)}
+                        className="w-full"
+                        size="sm"
+                        data-testid={`button-generate-${campaign.id}`}
+                      >
+                        {generating === campaign.id ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Generating...
+                          </>
                         ) : (
-                          <Button
-                            onClick={(e) => { e.stopPropagation(); handleGenerateEmail(campaign); }}
-                            disabled={generating === campaign.id || isGenerateDisabled(campaign.id)}
-                            className="flex-1"
-                            variant="default"
-                            data-testid={`button-generate-${campaign.id}`}
-                          >
-                            {generating === campaign.id ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                Generating...
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-4 h-4 mr-2" />
-                                Generate Email
-                              </>
-                            )}
-                          </Button>
+                          <>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Generate Email
+                          </>
                         )}
-                      </div>
-                    </div>
+                      </Button>
+                    )}
                   </div>
                 </motion.div>
               ))}
             </div>
           )}
-            </section>
           </TabsContent>
 
-          <TabsContent value="submissions" className="space-y-6">
-            <section>
-
-        {loadingSubmissions && submissions.length === 0 ? (
-          <div className="text-center py-20">
-            <RefreshCw className="w-12 h-12 animate-spin text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-500">Loading submissions...</p>
-          </div>
-        ) : submissions.length === 0 ? (
-          <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-100">
-            <Mail className="w-16 h-16 mx-auto mb-4 opacity-30" />
-            <p className="text-xl">No submissions yet</p>
-            <p className="text-sm mt-2">New business inquiries will appear here</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {submissions.map((submission, index) => (
-              <motion.div
-                key={submission.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-shadow duration-300 overflow-hidden border border-slate-100 flex flex-col"
-                data-testid={`card-submission-${submission.id}`}
-              >
-                <div className="p-6 flex-1">
-                  <div className="flex items-center space-x-2 text-blue-600 mb-4">
-                    <Building2 className="w-5 h-5 flex-shrink-0" />
-                    <h3 className="font-semibold text-lg text-slate-900">{submission.businessType}</h3>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2 text-slate-600">
-                      <MapPin className="w-4 h-4 flex-shrink-0" />
-                      <div className="text-sm">
-                        {submission.city}, {submission.province}, {submission.country}
-                      </div>
+          <TabsContent value="submissions" className="space-y-4 mt-0">
+            {loadingSubmissions && submissions.length === 0 ? (
+              <div className="text-center py-16">
+                <RefreshCw className="w-10 h-10 animate-spin text-slate-400 mx-auto mb-3" />
+                <p className="text-slate-500">Loading submissions...</p>
+              </div>
+            ) : submissions.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-lg border border-slate-200">
+                <Mail className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                <p className="text-lg text-slate-500">No submissions yet</p>
+                <p className="text-sm text-slate-400 mt-1">New business inquiries will appear here</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {submissions.map((submission, index) => (
+                  <motion.div
+                    key={submission.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="bg-white rounded-lg border border-slate-200 p-4 hover:border-slate-300 transition-colors"
+                    data-testid={`card-submission-${submission.id}`}
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <Building2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <h3 className="font-medium text-slate-900">{submission.businessType}</h3>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-slate-500 text-sm mb-3">
+                      <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{submission.city}, {submission.province}, {submission.country}</span>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100">
-                      <div className="text-xs text-slate-400">
-                        Submitted {new Date(submission.createdAt).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric', 
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
+                    <div className="text-xs text-slate-400">
+                      {new Date(submission.createdAt).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric'
+                      })}
                     </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
-            </section>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
@@ -926,7 +897,7 @@ export default function Admin() {
                                 }
                               }
                             }}
-                            disabled={saving || !editedSubject || !editedBody}
+                            disabled={saving || !editedBody.trim()}
                             variant="secondary"
                             className="flex-1"
                             data-testid="campaign-button-save-email"
@@ -1173,7 +1144,7 @@ export default function Admin() {
                     </Button>
                     <Button
                       onClick={handleSaveEmail}
-                      disabled={saving || !editedSubject || !editedBody}
+                      disabled={saving || !editedBody.trim()}
                       variant="secondary"
                       className="flex-1"
                       data-testid="button-save-email"
