@@ -241,9 +241,9 @@ export class FirestoreStorage implements IStorage {
           businessEmail: data.businessEmail || data.BusinessEmail || data.business_email || data.email || data.Email || undefined,
           address: data.address || data.Address || undefined,
           city: data.city || data.City || undefined,
-          mapLink: data.mapLink || data.MapLink || data.map_link || undefined,
+          mapLink: data.mapLink || data.MapLink || data.map_link || data['Map Link'] || undefined,
           phone: data.phone || data.Phone || undefined,
-          rating: data.rating || data.Rating || undefined,
+          rating: data.rating || data.Rating || data.Ratings || undefined,
           createdAt: data.createdAt?.toDate() || data.created_at?.toDate() || new Date(),
         };
       }) as CampaignData[];

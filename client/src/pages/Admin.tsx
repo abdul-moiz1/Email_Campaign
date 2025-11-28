@@ -478,22 +478,6 @@ export default function Admin() {
                         </div>
                       )}
 
-                      {campaign.mapLink && (
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          <ExternalLink className="w-4 h-4 flex-shrink-0" />
-                          <a 
-                            href={campaign.mapLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-sm text-blue-600 hover:underline truncate"
-                            onClick={(e) => e.stopPropagation()}
-                            data-testid={`link-map-${campaign.id}`}
-                          >
-                            View on Map
-                          </a>
-                        </div>
-                      )}
-
                       <div className="pt-3 border-t border-slate-100">
                         <div className="text-xs text-slate-400">
                           Added {new Date(campaign.createdAt).toLocaleDateString('en-US', { 
