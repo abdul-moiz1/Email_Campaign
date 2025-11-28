@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star, Plus } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star, Plus, Filter, CheckSquare, Square } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -11,7 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
+
+type FilterMode = 'all' | 'withEmail' | 'withoutEmail';
 
 function extractCityCountry(address: string | undefined): string {
   if (!address) return '';
@@ -84,7 +87,49 @@ export default function Admin() {
   const [showCustomInput, setShowCustomInput] = useState<Record<string, boolean>>({});
   const [editedSubject, setEditedSubject] = useState("");
   const [editedBody, setEditedBody] = useState("");
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  const filteredCampaigns = useMemo(() => {
+    switch (filterMode) {
+      case 'withEmail':
+        return campaigns.filter(c => c.hasEmail && c.email && c.email.aiEmail && c.email.aiEmail.trim() !== '');
+      case 'withoutEmail':
+        return campaigns.filter(c => !c.hasEmail || !c.email || !c.email.aiEmail || c.email.aiEmail.trim() === '');
+      default:
+        return campaigns;
+    }
+  }, [campaigns, filterMode]);
+
+  useEffect(() => {
+    setSelectedCampaignIds(prev => {
+      const currentCampaignIds = new Set(campaigns.map(c => c.id));
+      const validIds = new Set(Array.from(prev).filter(id => currentCampaignIds.has(id)));
+      return validIds.size !== prev.size ? validIds : prev;
+    });
+  }, [campaigns]);
+
+  const handleSelectAll = () => {
+    const allIds = new Set(filteredCampaigns.map(c => c.id));
+    setSelectedCampaignIds(allIds);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedCampaignIds(new Set());
+  };
+
+  const toggleCampaignSelection = (campaignId: string) => {
+    setSelectedCampaignIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(campaignId)) {
+        newSet.delete(campaignId);
+      } else {
+        newSet.add(campaignId);
+      }
+      return newSet;
+    });
+  };
 
   const fetchCampaigns = async () => {
     try {
@@ -333,7 +378,24 @@ export default function Admin() {
     setEditedBody(email.editedBody || email.aiEmail || "");
   };
 
-  const getEmailStatusBadge = (status: EmailStatus) => {
+  const getEmailBadge = (campaign: CampaignWithEmail) => {
+    const hasEmailContent = campaign.hasEmail && campaign.email && campaign.email.aiEmail && campaign.email.aiEmail.trim() !== '';
+    if (hasEmailContent) {
+      return (
+        <Badge variant="default" className="bg-green-100 text-green-700 border-green-200 flex-shrink-0" data-testid="badge-email">
+          <Mail className="w-3 h-3 mr-1" />
+          Email
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary" className="flex-shrink-0" data-testid="badge-no-email">
+        No Email
+      </Badge>
+    );
+  };
+
+  const getDetailedStatusBadge = (status: EmailStatus) => {
     const styles = {
       not_generated: "bg-slate-100 text-slate-600 border-slate-200",
       generated: "bg-blue-100 text-blue-700 border-blue-200",
@@ -415,43 +477,91 @@ export default function Admin() {
 
           <TabsContent value="campaigns" className="space-y-6">
             <section>
+              <div className="flex flex-col sm:flex-row gap-4 mb-6 items-start sm:items-center justify-between">
+                <div className="flex gap-2 flex-wrap items-center">
+                  <Select value={filterMode} onValueChange={(value: FilterMode) => setFilterMode(value)}>
+                    <SelectTrigger className="w-[160px]" data-testid="select-filter-mode">
+                      <Filter className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Filter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Campaigns</SelectItem>
+                      <SelectItem value="withEmail">With Email</SelectItem>
+                      <SelectItem value="withoutEmail">No Email</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-slate-500">
+                    Showing {filteredCampaigns.length} of {campaigns.length}
+                  </span>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    onClick={handleSelectAll}
+                    variant="outline"
+                    size="sm"
+                    disabled={filteredCampaigns.length === 0}
+                    data-testid="button-select-all"
+                  >
+                    <CheckSquare className="w-4 h-4 mr-2" />
+                    Select All ({filteredCampaigns.length})
+                  </Button>
+                  <Button
+                    onClick={handleDeselectAll}
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedCampaignIds.size === 0}
+                    data-testid="button-deselect-all"
+                  >
+                    <Square className="w-4 h-4 mr-2" />
+                    Deselect All
+                  </Button>
+                  {selectedCampaignIds.size > 0 && (
+                    <span className="text-sm text-slate-500 self-center">
+                      {selectedCampaignIds.size} selected
+                    </span>
+                  )}
+                </div>
+              </div>
           
           {loading && campaigns.length === 0 ? (
             <div className="text-center py-20">
               <RefreshCw className="w-12 h-12 animate-spin text-slate-400 mx-auto mb-4" />
               <p className="text-slate-500">Loading campaigns...</p>
             </div>
-          ) : campaigns.length === 0 ? (
+          ) : filteredCampaigns.length === 0 ? (
             <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-100">
               <Building2 className="w-16 h-16 mx-auto mb-4 opacity-30" />
-              <p className="text-xl">No campaigns found</p>
-              <p className="text-sm mt-2">Campaign data will appear here from the CampaignData collection</p>
+              <p className="text-xl">{campaigns.length === 0 ? 'No campaigns found' : 'No campaigns match the filter'}</p>
+              <p className="text-sm mt-2">{campaigns.length === 0 ? 'Campaign data will appear here from the CampaignData collection' : 'Try changing the filter'}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {campaigns.map((campaign, index) => (
+              {filteredCampaigns.map((campaign, index) => (
                 <motion.div
                   key={campaign.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-slate-100 flex flex-col cursor-pointer"
+                  className={`bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border flex flex-col cursor-pointer ${selectedCampaignIds.has(campaign.id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-100'}`}
                   onClick={() => setSelectedCampaign(campaign)}
                   data-testid={`card-campaign-${campaign.id}`}
                 >
                   <div className="p-6 flex-1">
                     <div className="flex items-start justify-between mb-4 gap-2">
-                      <div className="flex items-center space-x-2 text-blue-600 min-w-0">
-                        <Building2 className="w-5 h-5 flex-shrink-0" />
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <div 
+                          onClick={(e) => { e.stopPropagation(); toggleCampaignSelection(campaign.id); }}
+                          className="flex-shrink-0"
+                        >
+                          <Checkbox 
+                            checked={selectedCampaignIds.has(campaign.id)}
+                            data-testid={`checkbox-campaign-${campaign.id}`}
+                          />
+                        </div>
+                        <Building2 className="w-5 h-5 flex-shrink-0 text-blue-600" />
                         <h3 className="font-semibold text-lg text-slate-900 truncate">{campaign.businessName}</h3>
                       </div>
-                      {campaign.hasEmail && campaign.email ? (
-                        getEmailStatusBadge(campaign.email.status)
-                      ) : (
-                        <Badge variant="secondary" className="flex-shrink-0" data-testid="badge-no-email">
-                          No Email
-                        </Badge>
-                      )}
+                      {getEmailBadge(campaign)}
                     </div>
                     
                     <div className="space-y-3">
@@ -720,9 +830,17 @@ export default function Admin() {
 
                   {selectedCampaign.hasEmail && selectedCampaign.email ? (
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-slate-700">Email Status</span>
-                        {getEmailStatusBadge(selectedCampaign.email.status)}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-slate-700">Email Status</span>
+                          {getDetailedStatusBadge(selectedCampaign.email.status)}
+                        </div>
+                        {selectedCampaign.email.status !== 'not_generated' && (
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200" data-testid="badge-generated-by-ai">
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            Generated by AI
+                          </Badge>
+                        )}
                       </div>
                       
                       <div className="space-y-4 border-t border-slate-200 pt-4">
@@ -1006,9 +1124,17 @@ export default function Admin() {
                       </div>
                     )}
 
-                    <div className="pt-2 border-t border-slate-200 flex items-center gap-2">
-                      <span className="text-xs text-slate-500">Status: </span>
-                      {getEmailStatusBadge(selectedEmail.status)}
+                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500">Status: </span>
+                        {getDetailedStatusBadge(selectedEmail.status)}
+                      </div>
+                      {selectedEmail.status !== 'not_generated' && (
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200" data-testid="badge-generated-by-ai-modal">
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          Generated by AI
+                        </Badge>
+                      )}
                     </div>
                   </div>
 
