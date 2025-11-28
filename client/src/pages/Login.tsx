@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Mail, Lock, LogIn, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Mail, Lock, LogIn, Eye, EyeOff, AlertCircle, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,36 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const { user, loading: authLoading, login } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  // Redirect to admin if already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      setLocation("/admin");
+    }
+  }, [authLoading, user, setLocation]);
+
+  // Show loading state while checking auth or if authenticated (waiting for redirect)
+  // This prevents the login form from flashing before redirect
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="w-full max-w-md"
+        >
+          <Card className="border-slate-200 shadow-lg">
+            <CardContent className="flex items-center justify-center py-16">
+              <RefreshCw className="w-8 h-8 animate-spin text-slate-400" />
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

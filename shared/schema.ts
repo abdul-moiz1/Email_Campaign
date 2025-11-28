@@ -124,7 +124,15 @@ export interface GeneratedEmail {
   status: EmailStatus;
   createdAt: Date;
   updatedAt?: Date;
+  sentAt?: Date;
 }
+
+// Mark email as sent schema
+export const markEmailAsSentSchema = z.object({
+  emailId: z.string().min(1, "Email ID is required"),
+});
+
+export type MarkEmailAsSent = z.infer<typeof markEmailAsSentSchema>;
 
 // Send Email schema
 export const sendEmailSchema = z.object({

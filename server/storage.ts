@@ -8,6 +8,7 @@ export interface IStorage {
   updateEnrichedData(id: string, enrichedData: EnrichedBusinessData): Promise<Submission>;
   getAllGeneratedEmails(): Promise<GeneratedEmail[]>;
   updateEmailStatus(emailId: string, status: EmailStatus): Promise<void>;
+  markEmailAsSent(emailId: string): Promise<GeneratedEmail>;
   updateEmailContent(emailId: string, subject: string, body: string): Promise<GeneratedEmail>;
   updateEmailWithGenerated(emailId: string, subject: string, aiEmail: string, selectedProduct: ProductType): Promise<GeneratedEmail>;
   getAllCampaigns(): Promise<CampaignData[]>;
@@ -155,10 +156,58 @@ export class FirestoreStorage implements IStorage {
       throw new Error('Email not found');
     }
 
-    await docRef.update({
+    const updateData: Record<string, any> = {
       status,
       updatedAt: new Date(),
+    };
+
+    // Add sentAt timestamp when marking as sent
+    if (status === 'sent') {
+      updateData.sentAt = new Date();
+    }
+
+    await docRef.update(updateData);
+  }
+
+  async markEmailAsSent(emailId: string): Promise<GeneratedEmail> {
+    const docRef = this.db.collection('generatedEmails').doc(emailId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      throw new Error('Email not found');
+    }
+
+    const existingData = doc.data()!;
+    const now = new Date();
+
+    await docRef.update({
+      status: 'sent',
+      sentAt: now,
+      updatedAt: now,
     });
+
+    // Return with Date objects for createdAt/updatedAt/sentAt (matches existing pattern)
+    const createdAt = existingData.createdAt?.toDate() || new Date();
+    
+    return {
+      id: emailId,
+      campaignId: existingData.campaignId || existingData.CampaignId || existingData['Campaign ID'] || existingData.campaign_id || emailId,
+      businessName: existingData.BusinessName || existingData.businessName || '',
+      address: existingData.Address || existingData.address || '',
+      businessEmail: existingData.BusinessEmail || existingData.businessEmail || '',
+      phoneNumber: existingData.PhoneNumber || existingData.phoneNumber || undefined,
+      website: existingData.Website || existingData.website || undefined,
+      selectedProduct: existingData.selectedProduct || undefined,
+      subject: existingData.subject || undefined,
+      aiEmail: existingData.AIEmail || existingData.aiEmail || '',
+      editedSubject: existingData.editedSubject || undefined,
+      editedBody: existingData.editedBody || undefined,
+      mapLink: existingData.MapLink && existingData.MapLink.trim() !== '' ? existingData.MapLink : undefined,
+      status: 'sent',
+      createdAt,
+      updatedAt: now,
+      sentAt: now,
+    } as GeneratedEmail;
   }
 
   async updateEmailContent(emailId: string, subject: string, body: string): Promise<GeneratedEmail> {

@@ -49,10 +49,19 @@ export default function Home() {
       const result = await response.json();
       console.log("Submission result:", result);
       
-      toast({
-        title: "Submission successful!",
-        description: "Your information has been saved and sent for processing.",
-      });
+      // Check webhook status for duplicate handling
+      if (result.webhookStatus === 'exists') {
+        toast({
+          title: "Business already exists",
+          description: "This business is already in the database.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Business saved successfully",
+          description: "Your information has been saved and sent for processing.",
+        });
+      }
       
       setTimeout(() => {
         setLocation("/success");

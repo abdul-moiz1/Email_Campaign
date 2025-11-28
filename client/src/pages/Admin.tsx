@@ -136,6 +136,7 @@ export default function Admin() {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
   const [sendingAll, setSendingAll] = useState(false);
+  const [markingAsSent, setMarkingAsSent] = useState(false);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -471,6 +472,52 @@ export default function Admin() {
       });
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleMarkAsSent = async () => {
+    if (!selectedEmail) return;
+
+    setMarkingAsSent(true);
+    
+    try {
+      const response = await authenticatedFetch(`/api/emails/${selectedEmail.id}/mark-sent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to mark email as sent");
+      }
+
+      const result = await response.json();
+
+      // Update the campaigns list
+      setCampaigns(campaigns.map(c => 
+        c.email?.id === selectedEmail.id 
+          ? { ...c, email: result.email }
+          : c
+      ));
+      
+      // Update the selected email state
+      setSelectedEmail(result.email);
+      
+      toast({
+        title: "Email marked as sent",
+        description: "The email status has been updated.",
+      });
+    } catch (error: any) {
+      console.error("Mark as sent error:", error);
+      toast({
+        title: "Failed to mark email as sent",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setMarkingAsSent(false);
     }
   };
 
@@ -1424,7 +1471,7 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-4 border-t">
+                  <div className="flex flex-wrap gap-3 pt-4 border-t">
                     <Button
                       onClick={() => setSelectedEmail(null)}
                       variant="outline"
@@ -1452,6 +1499,27 @@ export default function Admin() {
                         </>
                       )}
                     </Button>
+                    {selectedEmail.status !== 'sent' && hasEmailContent(selectedEmail) && (
+                      <Button
+                        onClick={handleMarkAsSent}
+                        disabled={markingAsSent}
+                        variant="outline"
+                        className="flex-1"
+                        data-testid="button-mark-as-sent"
+                      >
+                        {markingAsSent ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Marking...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4 mr-2" />
+                            Mark as Sent
+                          </>
+                        )}
+                      </Button>
+                    )}
                     <Button
                       onClick={handleSendEmail}
                       disabled={sending || selectedEmail.status === 'sent' || !hasEmailContent(selectedEmail)}

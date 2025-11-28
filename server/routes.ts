@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { initializeFirebase } from "./firebase";
-import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema, sendEmailSchema, generateEmailSchema, updateEmailSchema, generateEmailFromCampaignSchema } from "@shared/schema";
+import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema, sendEmailSchema, generateEmailSchema, updateEmailSchema, generateEmailFromCampaignSchema, markEmailAsSentSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { getUncachableSendGridClient } from "./sendgrid";
 import { requireAuth, type AuthenticatedRequest } from "./authMiddleware";
@@ -76,10 +76,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log("✓ Data sent to Make.com webhook successfully");
         
+        // Parse webhook response to check for duplicate status
+        let webhookStatus = 'saved';
+        const contentType = webhookResponse.headers.get('content-type') || '';
+        
+        if (contentType.includes('application/json')) {
+          try {
+            const responseText = await webhookResponse.text();
+            if (responseText && responseText.trim()) {
+              const webhookData = JSON.parse(responseText);
+              if (webhookData && webhookData.status) {
+                webhookStatus = webhookData.status;
+                console.log("Webhook status:", webhookStatus);
+              }
+            }
+          } catch (parseError) {
+            // JSON parsing failed, continue with default status
+            console.log("Could not parse webhook JSON response, using default status");
+          }
+        } else {
+          // Non-JSON response, use default status
+          console.log("Webhook returned non-JSON response, using default status 'saved'");
+        }
+        
         // Only send success response when webhook succeeds
         return res.status(201).json({ 
-          message: "Submission successful",
-          submission
+          message: webhookStatus === 'exists' ? "Business already exists" : "Submission successful",
+          submission,
+          webhookStatus
         });
       } catch (makeError) {
         console.error("✗ Make.com webhook error:", makeError);
@@ -322,6 +346,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ 
           message: "Failed to update email",
+          error: error.message 
+        });
+      }
+    }
+  });
+
+  // Mark email as sent (without actually sending via SendGrid)
+  app.post("/api/emails/:id/mark-sent", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Validate the email ID
+      if (!id || typeof id !== 'string' || id.trim() === '') {
+        return res.status(400).json({ message: "Valid email ID is required" });
+      }
+      
+      console.log(`Marking email ${id} as sent`);
+      
+      const updated = await storage.markEmailAsSent(id);
+      
+      res.json({ 
+        message: "Email marked as sent",
+        email: updated
+      });
+    } catch (error: any) {
+      console.error("Mark as sent error:", error);
+      if (error.message === 'Email not found') {
+        res.status(404).json({ message: error.message });
+      } else {
+        res.status(500).json({ 
+          message: "Failed to mark email as sent",
           error: error.message 
         });
       }
