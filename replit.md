@@ -95,22 +95,50 @@ submissions/
     updatedAt: Timestamp
   }
 
-generated-emails/
-  {id}: {
-    BusinessName: string,          // Capitalized field name
+CampaignData/
+  {PlaceID}: {                      // Document ID is the Google Place ID
+    BusinessName: string,           // Mixed-case field naming
+    BusinessEmail?: string,
+    Address: string,
+    "Map Link"?: string,            // Field name with SPACE - access via data['Map Link']
+    Phone?: string,
+    Rating?: string,
+    createdAt: Timestamp
+  }
+
+generatedEmails/
+  {PlaceID}: {                      // Document ID is the Google Place ID (matches CampaignData)
+    BusinessName: string,           // Mixed-case field naming
     Address: string,                // Full address (e.g., "street, city, province postal, country")
-    BusinessEmail?: string,         // Capitalized field name
-    AIEmail: string,                // Capitalized field name - AI-generated email content
-    MapLink?: string,               // Capitalized field name - Google Maps link
-    // Note: No createdAt field - sorting done in-memory on client
+    BusinessEmail?: string,
+    AIEmail: string,                // AI-generated email content
+    MapLink?: string,               // Google Maps link (note: different from CampaignData's "Map Link")
+    subject?: string,
+    editedSubject?: string,
+    editedBody?: string,
+    status: 'not_generated' | 'generated' | 'edited' | 'sent',
+    createdAt: Timestamp,
+    updatedAt?: Timestamp
+    // Note: No explicit campaignId field - the document ID IS the campaign ID (Place ID)
   }
 ```
 
+**Campaign-Email Matching Architecture**
+- CampaignData documents use Google Place IDs as document IDs
+- generatedEmails documents also use Google Place IDs as document IDs
+- The storage layer matches campaigns to emails by using the document ID as the campaign identifier
+- Code fallback pattern: `data.campaignId || data['Campaign ID'] || doc.id`
+
+**Firestore Field Naming Notes**
+- Fields use mixed-case naming (e.g., "BusinessName", "AIEmail")
+- Some fields have spaces (e.g., "Map Link" in CampaignData)
+- Backend handles multiple field name variations for robustness
+
 **UI Display Notes**
-- Email cards show compact location format by parsing Address field: "City, Province, Country"
-- Address parser extracts the last 3 comma-separated segments with error handling
-- No status badges or action buttons displayed on cards (clean, read-only display)
-- Cards show: business name, location icon with compact address, business email (if available), and timestamp
+- Campaign cards show: business name, location, email, phone, status badge
+- Map link is only shown in the detail dialog (not on cards) - clickable link to Google Maps
+- Email status badges: "No Email", "Not Generated", "Generated", "Edited", "Sent"
+- Cards with emails show "View / Edit Email" button instead of "Generate Email"
 
 **Configuration Note**
 - Despite Drizzle ORM being configured (drizzle.config.ts with PostgreSQL dialect), the application currently uses Firebase Firestore exclusively
