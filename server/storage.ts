@@ -111,9 +111,12 @@ export class FirestoreStorage implements IStorage {
 
     const emails = snapshot.docs.map(doc => {
       const data = doc.data();
+      // Use the document ID as campaignId if no explicit campaignId field exists
+      // The generatedEmails collection uses Place IDs as document IDs which match campaign IDs
+      const campaignId = data.campaignId || data.CampaignId || data['Campaign ID'] || data.campaign_id || doc.id;
       return {
         id: doc.id,
-        campaignId: data.campaignId || undefined,
+        campaignId,
         businessName: data.BusinessName || data.businessName || '',
         address: data.Address || data.address || '',
         businessEmail: data.BusinessEmail || data.businessEmail || '',
@@ -169,7 +172,7 @@ export class FirestoreStorage implements IStorage {
 
     return {
       id: emailId,
-      campaignId: existingData.campaignId || undefined,
+      campaignId: existingData.campaignId || existingData.CampaignId || existingData['Campaign ID'] || existingData.campaign_id || emailId,
       businessName: existingData.BusinessName || existingData.businessName || '',
       address: existingData.Address || existingData.address || '',
       businessEmail: existingData.BusinessEmail || existingData.businessEmail || '',
@@ -208,7 +211,7 @@ export class FirestoreStorage implements IStorage {
 
     return {
       id: emailId,
-      campaignId: existingData.campaignId || undefined,
+      campaignId: existingData.campaignId || existingData.CampaignId || existingData['Campaign ID'] || existingData.campaign_id || emailId,
       businessName: existingData.BusinessName || existingData.businessName || '',
       address: existingData.Address || existingData.address || '',
       businessEmail: existingData.BusinessEmail || existingData.businessEmail || '',
@@ -257,6 +260,33 @@ export class FirestoreStorage implements IStorage {
   }
 
   async getEmailByCampaignId(campaignId: string): Promise<GeneratedEmail | null> {
+    // First try to get by document ID (most generatedEmails use Place ID as doc ID)
+    const docRef = this.db.collection('generatedEmails').doc(campaignId);
+    const doc = await docRef.get();
+
+    if (doc.exists) {
+      const data = doc.data()!;
+      return {
+        id: doc.id,
+        campaignId: data.campaignId || data.CampaignId || data['Campaign ID'] || data.campaign_id || doc.id,
+        businessName: data.BusinessName || data.businessName || '',
+        address: data.Address || data.address || '',
+        businessEmail: data.BusinessEmail || data.businessEmail || '',
+        phoneNumber: data.PhoneNumber || data.phoneNumber || undefined,
+        website: data.Website || data.website || undefined,
+        selectedProduct: data.selectedProduct || undefined,
+        subject: data.subject || undefined,
+        aiEmail: data.AIEmail || data.aiEmail || '',
+        editedSubject: data.editedSubject || undefined,
+        editedBody: data.editedBody || undefined,
+        mapLink: data.MapLink && data.MapLink.trim() !== '' ? data.MapLink : undefined,
+        status: data.status || 'not_generated',
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || undefined,
+      };
+    }
+
+    // Fallback: try to query by campaignId field (for older documents that may have it)
     const snapshot = await this.db
       .collection('generatedEmails')
       .where('campaignId', '==', campaignId)
@@ -267,26 +297,26 @@ export class FirestoreStorage implements IStorage {
       return null;
     }
 
-    const doc = snapshot.docs[0];
-    const data = doc.data();
+    const fieldDoc = snapshot.docs[0];
+    const fieldData = fieldDoc.data();
 
     return {
-      id: doc.id,
-      campaignId: data.campaignId,
-      businessName: data.BusinessName || data.businessName || '',
-      address: data.Address || data.address || '',
-      businessEmail: data.BusinessEmail || data.businessEmail || '',
-      phoneNumber: data.PhoneNumber || data.phoneNumber || undefined,
-      website: data.Website || data.website || undefined,
-      selectedProduct: data.selectedProduct || undefined,
-      subject: data.subject || undefined,
-      aiEmail: data.AIEmail || data.aiEmail || '',
-      editedSubject: data.editedSubject || undefined,
-      editedBody: data.editedBody || undefined,
-      mapLink: data.MapLink && data.MapLink.trim() !== '' ? data.MapLink : undefined,
-      status: data.status || 'not_generated',
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || undefined,
+      id: fieldDoc.id,
+      campaignId: fieldData.campaignId || fieldDoc.id,
+      businessName: fieldData.BusinessName || fieldData.businessName || '',
+      address: fieldData.Address || fieldData.address || '',
+      businessEmail: fieldData.BusinessEmail || fieldData.businessEmail || '',
+      phoneNumber: fieldData.PhoneNumber || fieldData.phoneNumber || undefined,
+      website: fieldData.Website || fieldData.website || undefined,
+      selectedProduct: fieldData.selectedProduct || undefined,
+      subject: fieldData.subject || undefined,
+      aiEmail: fieldData.AIEmail || fieldData.aiEmail || '',
+      editedSubject: fieldData.editedSubject || undefined,
+      editedBody: fieldData.editedBody || undefined,
+      mapLink: fieldData.MapLink && fieldData.MapLink.trim() !== '' ? fieldData.MapLink : undefined,
+      status: fieldData.status || 'not_generated',
+      createdAt: fieldData.createdAt?.toDate() || new Date(),
+      updatedAt: fieldData.updatedAt?.toDate() || undefined,
     };
   }
 
