@@ -10,6 +10,25 @@ export const businessSubmissionSchema = z.object({
 
 export type BusinessSubmission = z.infer<typeof businessSubmissionSchema>;
 
+// CampaignData schema (from Firestore CampaignData collection)
+export interface CampaignData {
+  id: string;
+  businessName: string;
+  businessEmail?: string;
+  address?: string;
+  city?: string;
+  mapLink?: string;
+  phone?: string;
+  rating?: number | string;
+  createdAt: Date;
+}
+
+// CampaignData with associated email status
+export interface CampaignWithEmail extends CampaignData {
+  email?: GeneratedEmail;
+  hasEmail: boolean;
+}
+
 // Submission record (stored in Firestore)
 export interface Submission {
   id: string;
@@ -90,6 +109,7 @@ export type EmailStatus = 'not_generated' | 'generated' | 'edited' | 'sent';
 // Generated Email schema (from Make.com AI)
 export interface GeneratedEmail {
   id: string;
+  campaignId?: string;
   businessName: string;
   address: string;
   businessEmail: string;
@@ -136,3 +156,17 @@ export const updateEmailSchema = z.object({
 });
 
 export type UpdateEmail = z.infer<typeof updateEmailSchema>;
+
+// Generate Email from Admin (CampaignData) schema
+export const generateEmailFromCampaignSchema = z.object({
+  campaignId: z.string().min(1, "Campaign ID is required"),
+  businessName: z.string().min(1, "Business name is required"),
+  businessEmail: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  mapLink: z.string().optional(),
+  rating: z.union([z.string(), z.number()]).optional(),
+  product: z.enum(['AI Calling Agent', 'AI Chatbot', 'Booking Assistant', 'Custom AI Solution']),
+});
+
+export type GenerateEmailFromCampaign = z.infer<typeof generateEmailFromCampaignSchema>;

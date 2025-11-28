@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, ChevronDown } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -10,21 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
-
-interface Submission {
-  id: string;
-  businessType: string;
-  city: string;
-  province: string;
-  country: string;
-  status: 'pending' | 'approved' | 'rejected' | 'contacted';
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface GeneratedEmail {
   id: string;
+  campaignId?: string;
   businessName: string;
   address: string;
   businessEmail: string;
@@ -41,12 +32,36 @@ interface GeneratedEmail {
   updatedAt?: string;
 }
 
+interface CampaignWithEmail {
+  id: string;
+  businessName: string;
+  businessEmail?: string;
+  address?: string;
+  city?: string;
+  mapLink?: string;
+  phone?: string;
+  rating?: number | string;
+  createdAt: string;
+  email?: GeneratedEmail;
+  hasEmail: boolean;
+}
+
+interface Submission {
+  id: string;
+  businessType: string;
+  city: string;
+  province: string;
+  country: string;
+  status: 'pending' | 'approved' | 'rejected' | 'contacted';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function Admin() {
+  const [campaigns, setCampaigns] = useState<CampaignWithEmail[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [generatedEmails, setGeneratedEmails] = useState<GeneratedEmail[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingEmails, setLoadingEmails] = useState(true);
-  const [updating, setUpdating] = useState<string | null>(null);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState<GeneratedEmail | null>(null);
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,9 +72,32 @@ export default function Admin() {
   const [editedBody, setEditedBody] = useState("");
   const { toast } = useToast();
 
-  const fetchSubmissions = async () => {
+  const fetchCampaigns = async () => {
     try {
       setLoading(true);
+      const response = await fetch("/api/campaigns");
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch campaigns");
+      }
+      
+      const data = await response.json();
+      setCampaigns(data);
+    } catch (error: any) {
+      console.error("Fetch error:", error);
+      toast({
+        title: "Error loading campaigns",
+        description: error.message || "Please check your Firebase configuration.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSubmissions = async () => {
+    try {
+      setLoadingSubmissions(true);
       const response = await fetch("/api/submissions");
       
       if (!response.ok) {
@@ -76,76 +114,17 @@ export default function Admin() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchGeneratedEmails = async () => {
-    try {
-      setLoadingEmails(true);
-      const response = await fetch("/api/emails/generated");
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch generated emails");
-      }
-      
-      const data = await response.json();
-      setGeneratedEmails(data);
-    } catch (error: any) {
-      console.error("Fetch emails error:", error);
-      toast({
-        title: "Error loading emails",
-        description: error.message || "Please check your Firebase configuration.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingEmails(false);
+      setLoadingSubmissions(false);
     }
   };
 
   useEffect(() => {
+    fetchCampaigns();
     fetchSubmissions();
-    fetchGeneratedEmails();
   }, []);
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
-    setUpdating(id);
-    
-    try {
-      const response = await fetch(`/api/submissions/${id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update status");
-      }
-
-      const updated = await response.json();
-      
-      setSubmissions(submissions.map(s => s.id === id ? updated : s));
-      
-      toast({
-        title: "Status updated",
-        description: `Submission marked as ${newStatus}.`,
-      });
-    } catch (error: any) {
-      console.error("Update error:", error);
-      toast({
-        title: "Update failed",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setUpdating(null);
-    }
-  };
-
-  const handleGenerateEmail = async (email: GeneratedEmail) => {
-    const selectedProduct = selectedProducts[email.id];
+  const handleGenerateEmail = async (campaign: CampaignWithEmail) => {
+    const selectedProduct = selectedProducts[campaign.id];
     
     if (!selectedProduct) {
       toast({
@@ -156,22 +135,22 @@ export default function Admin() {
       return;
     }
 
-    setGenerating(email.id);
+    setGenerating(campaign.id);
     
     try {
-      const response = await fetch("/api/emails/generate", {
+      const response = await fetch(`/api/campaigns/${campaign.id}/generate-email`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          emailId: email.id,
-          businessName: email.businessName,
-          businessEmail: email.businessEmail || undefined,
-          phoneNumber: email.phoneNumber || undefined,
-          selectedProduct,
-          address: email.address,
-          website: email.website || undefined,
+          businessName: campaign.businessName,
+          businessEmail: campaign.businessEmail || undefined,
+          phone: campaign.phone || undefined,
+          address: campaign.address || undefined,
+          mapLink: campaign.mapLink || undefined,
+          rating: campaign.rating || undefined,
+          product: selectedProduct,
         }),
       });
 
@@ -179,17 +158,16 @@ export default function Admin() {
         const error = await response.json();
         throw new Error(error.message || "Failed to generate email");
       }
-
-      const result = await response.json();
-      
-      setGeneratedEmails(generatedEmails.map(e => 
-        e.id === email.id ? result.email : e
-      ));
       
       toast({
-        title: "Email generated",
-        description: "AI-generated email is ready for review.",
+        title: "Email generation started",
+        description: "The email is being generated. Please refresh in a moment to see the result.",
       });
+
+      // Wait a moment then refresh to get the updated data
+      setTimeout(() => {
+        fetchCampaigns();
+      }, 3000);
     } catch (error: any) {
       console.error("Generate error:", error);
       toast({
@@ -226,8 +204,11 @@ export default function Admin() {
 
       const result = await response.json();
       
-      setGeneratedEmails(generatedEmails.map(e => 
-        e.id === selectedEmail.id ? result.email : e
+      // Update the campaigns list with the new email data
+      setCampaigns(campaigns.map(c => 
+        c.email?.id === selectedEmail.id 
+          ? { ...c, email: result.email }
+          : c
       ));
       
       setSelectedEmail(result.email);
@@ -277,8 +258,11 @@ export default function Admin() {
         throw new Error(error.message || "Failed to send email");
       }
 
-      setGeneratedEmails(generatedEmails.map(e => 
-        e.id === selectedEmail.id ? { ...e, status: 'sent' as EmailStatus } : e
+      // Update the campaigns list
+      setCampaigns(campaigns.map(c => 
+        c.email?.id === selectedEmail.id 
+          ? { ...c, email: { ...c.email!, status: 'sent' as EmailStatus } }
+          : c
       ));
       
       toast({
@@ -305,7 +289,7 @@ export default function Admin() {
     setEditedBody(email.editedBody || email.aiEmail || "");
   };
 
-  const getStatusBadge = (status: EmailStatus) => {
+  const getEmailStatusBadge = (status: EmailStatus) => {
     const styles = {
       not_generated: "bg-slate-100 text-slate-600 border-slate-200",
       generated: "bg-blue-100 text-blue-700 border-blue-200",
@@ -328,15 +312,15 @@ export default function Admin() {
     };
 
     return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center ${styles[status]}`} data-testid={`badge-status-${status}`}>
+      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center ${styles[status]}`} data-testid={`badge-email-status-${status}`}>
         {icons[status]}
         {labels[status]}
       </span>
     );
   };
 
-  const hasEmailContent = (email: GeneratedEmail) => {
-    return email.aiEmail && email.aiEmail.trim() !== '';
+  const hasEmailContent = (email: GeneratedEmail | undefined) => {
+    return email && email.aiEmail && email.aiEmail.trim() !== '';
   };
 
   return (
@@ -349,19 +333,19 @@ export default function Admin() {
         >
           <div>
             <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Admin Dashboard</h1>
-            <p className="text-slate-500 text-lg">Review submissions and AI-generated emails</p>
+            <p className="text-slate-500 text-lg">Manage campaigns and AI-generated emails</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button
               onClick={() => {
+                fetchCampaigns();
                 fetchSubmissions();
-                fetchGeneratedEmails();
               }}
-              disabled={loading || loadingEmails}
+              disabled={loading || loadingSubmissions}
               variant="outline"
               data-testid="button-refresh"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${(loading || loadingEmails) ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 mr-2 ${(loading || loadingSubmissions) ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
             <Button asChild variant="outline">
@@ -373,98 +357,107 @@ export default function Admin() {
           </div>
         </motion.div>
 
-        <Tabs defaultValue="emails" className="space-y-6">
+        <Tabs defaultValue="campaigns" className="space-y-6">
           <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-admin">
-            <TabsTrigger value="emails" data-testid="tab-emails" className="flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Emails ({generatedEmails.length})
+            <TabsTrigger value="campaigns" data-testid="tab-campaigns" className="flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Campaigns ({campaigns.length})
             </TabsTrigger>
             <TabsTrigger value="submissions" data-testid="tab-submissions" className="flex items-center gap-2">
-              <Building2 className="w-4 h-4" />
+              <Mail className="w-4 h-4" />
               Submissions ({submissions.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="emails" className="space-y-6">
+          <TabsContent value="campaigns" className="space-y-6">
             <section>
           
-          {loadingEmails && generatedEmails.length === 0 ? (
+          {loading && campaigns.length === 0 ? (
             <div className="text-center py-20">
               <RefreshCw className="w-12 h-12 animate-spin text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500">Loading emails...</p>
+              <p className="text-slate-500">Loading campaigns...</p>
             </div>
-          ) : generatedEmails.length === 0 ? (
+          ) : campaigns.length === 0 ? (
             <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-100">
-              <Mail className="w-16 h-16 mx-auto mb-4 opacity-30" />
-              <p className="text-xl">No AI-generated emails yet</p>
-              <p className="text-sm mt-2">Generated emails from Make.com will appear here</p>
+              <Building2 className="w-16 h-16 mx-auto mb-4 opacity-30" />
+              <p className="text-xl">No campaigns found</p>
+              <p className="text-sm mt-2">Campaign data will appear here from the CampaignData collection</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {generatedEmails.map((email, index) => (
+              {campaigns.map((campaign, index) => (
                 <motion.div
-                  key={email.id}
+                  key={campaign.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                   className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-slate-100 flex flex-col"
-                  data-testid={`card-email-${email.id}`}
+                  data-testid={`card-campaign-${campaign.id}`}
                 >
                   <div className="p-6 flex-1">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-2 text-blue-600">
+                    <div className="flex items-start justify-between mb-4 gap-2">
+                      <div className="flex items-center space-x-2 text-blue-600 min-w-0">
                         <Building2 className="w-5 h-5 flex-shrink-0" />
-                        <h3 className="font-semibold text-lg text-slate-900">{email.businessName}</h3>
+                        <h3 className="font-semibold text-lg text-slate-900 truncate">{campaign.businessName}</h3>
                       </div>
-                      {getStatusBadge(email.status)}
+                      {campaign.hasEmail && campaign.email ? (
+                        getEmailStatusBadge(campaign.email.status)
+                      ) : (
+                        <Badge variant="secondary" className="flex-shrink-0" data-testid="badge-no-email">
+                          No Email
+                        </Badge>
+                      )}
                     </div>
                     
                     <div className="space-y-3">
-                      <div className="flex items-center space-x-2 text-slate-600">
-                        <MapPin className="w-4 h-4 flex-shrink-0" />
-                        <div className="text-sm">
-                          {(() => {
-                            try {
-                              const parts = email.address.split(',').map(p => p.trim());
-                              if (parts.length >= 3) {
-                                const country = parts[parts.length - 1];
-                                const provinceSection = parts[parts.length - 2].split(' ');
-                                const province = provinceSection[0];
-                                const city = parts[parts.length - 3];
-                                return `${city}, ${province}, ${country}`;
-                              }
-                            } catch (e) {}
-                            return email.address;
-                          })()}
+                      {(campaign.city || campaign.address) && (
+                        <div className="flex items-center space-x-2 text-slate-600">
+                          <MapPin className="w-4 h-4 flex-shrink-0" />
+                          <div className="text-sm truncate">
+                            {campaign.city || campaign.address}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      {email.businessEmail && (
+                      {campaign.businessEmail && (
                         <div className="flex items-center space-x-2 text-slate-600">
                           <Mail className="w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm truncate">{email.businessEmail}</span>
+                          <span className="text-sm truncate">{campaign.businessEmail}</span>
                         </div>
                       )}
 
-                      {email.phoneNumber && (
+                      {campaign.phone && (
                         <div className="flex items-center space-x-2 text-slate-600">
                           <Phone className="w-4 h-4 flex-shrink-0" />
-                          <span className="text-sm">{email.phoneNumber}</span>
+                          <span className="text-sm">{campaign.phone}</span>
                         </div>
                       )}
 
-                      {email.website && (
+                      {campaign.rating && (
                         <div className="flex items-center space-x-2 text-slate-600">
-                          <Globe className="w-4 h-4 flex-shrink-0" />
-                          <a href={email.website} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate">
-                            {email.website}
+                          <Star className="w-4 h-4 flex-shrink-0 text-yellow-500" />
+                          <span className="text-sm">{campaign.rating}</span>
+                        </div>
+                      )}
+
+                      {campaign.mapLink && (
+                        <div className="flex items-center space-x-2">
+                          <ExternalLink className="w-4 h-4 flex-shrink-0 text-slate-500" />
+                          <a 
+                            href={campaign.mapLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-sm text-blue-600 hover:underline"
+                            data-testid={`link-map-${campaign.id}`}
+                          >
+                            View on Map
                           </a>
                         </div>
                       )}
 
                       <div className="pt-3 border-t border-slate-100">
                         <div className="text-xs text-slate-400">
-                          Generated {new Date(email.createdAt).toLocaleDateString('en-US', { 
+                          Added {new Date(campaign.createdAt).toLocaleDateString('en-US', { 
                             month: 'short', 
                             day: 'numeric', 
                             year: 'numeric',
@@ -477,10 +470,10 @@ export default function Admin() {
 
                     <div className="mt-4 space-y-3">
                       <Select 
-                        value={selectedProducts[email.id] || email.selectedProduct || ""} 
-                        onValueChange={(value) => setSelectedProducts({...selectedProducts, [email.id]: value as ProductType})}
+                        value={selectedProducts[campaign.id] || campaign.email?.selectedProduct || ""} 
+                        onValueChange={(value) => setSelectedProducts({...selectedProducts, [campaign.id]: value as ProductType})}
                       >
-                        <SelectTrigger className="w-full" data-testid={`select-product-${email.id}`}>
+                        <SelectTrigger className="w-full" data-testid={`select-product-${campaign.id}`}>
                           <SelectValue placeholder="Select Product" />
                         </SelectTrigger>
                         <SelectContent>
@@ -493,40 +486,40 @@ export default function Admin() {
                       </Select>
 
                       <div className="flex gap-2">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGenerateEmail(email);
-                          }}
-                          disabled={generating === email.id || !selectedProducts[email.id]}
-                          className="flex-1"
-                          variant="default"
-                          data-testid={`button-generate-${email.id}`}
-                        >
-                          {generating === email.id ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-4 h-4 mr-2" />
-                              Generate Email
-                            </>
-                          )}
-                        </Button>
+                        {campaign.hasEmail && hasEmailContent(campaign.email) ? (
+                          <Button
+                            onClick={() => campaign.email && openEmailModal(campaign.email)}
+                            className="flex-1"
+                            variant="default"
+                            data-testid={`button-view-email-${campaign.id}`}
+                          >
+                            <Mail className="w-4 h-4 mr-2" />
+                            View / Edit Email
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleGenerateEmail(campaign)}
+                            disabled={generating === campaign.id || !selectedProducts[campaign.id]}
+                            className="flex-1"
+                            variant="default"
+                            data-testid={`button-generate-${campaign.id}`}
+                          >
+                            {generating === campaign.id ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Generate Email
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
-
-                  {hasEmailContent(email) && (
-                    <div 
-                      className="p-4 bg-blue-50 border-t border-blue-100 text-center cursor-pointer hover:bg-blue-100 transition-colors"
-                      onClick={() => openEmailModal(email)}
-                    >
-                      <p className="text-sm text-blue-700 font-medium">Click to review & edit email</p>
-                    </div>
-                  )}
                 </motion.div>
               ))}
             </div>
@@ -537,14 +530,14 @@ export default function Admin() {
           <TabsContent value="submissions" className="space-y-6">
             <section>
 
-        {loading && submissions.length === 0 ? (
+        {loadingSubmissions && submissions.length === 0 ? (
           <div className="text-center py-20">
             <RefreshCw className="w-12 h-12 animate-spin text-slate-400 mx-auto mb-4" />
             <p className="text-slate-500">Loading submissions...</p>
           </div>
         ) : submissions.length === 0 ? (
-          <div className="text-center py-20 text-slate-400">
-            <Building2 className="w-16 h-16 mx-auto mb-4 opacity-30" />
+          <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-100">
+            <Mail className="w-16 h-16 mx-auto mb-4 opacity-30" />
             <p className="text-xl">No submissions yet</p>
             <p className="text-sm mt-2">New business inquiries will appear here</p>
           </div>
@@ -599,7 +592,7 @@ export default function Admin() {
             <AlertDialogHeader>
               <AlertDialogTitle>No Recipient Email</AlertDialogTitle>
               <AlertDialogDescription>
-                This email card does not have a recipient email address. Please add an email address before sending.
+                This campaign does not have a recipient email address. Please add an email address before sending.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -644,12 +637,14 @@ export default function Admin() {
                     </h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 mt-0.5 text-slate-500 flex-shrink-0" />
-                        <div className="text-slate-600 text-sm">
-                          {selectedEmail.address}
+                      {selectedEmail.address && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 mt-0.5 text-slate-500 flex-shrink-0" />
+                          <div className="text-slate-600 text-sm">
+                            {selectedEmail.address}
+                          </div>
                         </div>
-                      </div>
+                      )}
                       
                       {selectedEmail.phoneNumber && (
                         <div className="flex items-center gap-2">
@@ -683,6 +678,11 @@ export default function Admin() {
                         <span className="text-sm font-medium text-slate-700">{selectedEmail.selectedProduct}</span>
                       </div>
                     )}
+
+                    <div className="pt-2 border-t border-slate-200 flex items-center gap-2">
+                      <span className="text-xs text-slate-500">Status: </span>
+                      {getEmailStatusBadge(selectedEmail.status)}
+                    </div>
                   </div>
 
                   <div className="space-y-4">
@@ -768,33 +768,5 @@ export default function Admin() {
         </Dialog>
       </div>
     </div>
-  );
-}
-
-function Badge({ status }: { status: string }) {
-  const styles = {
-    pending: "bg-amber-100 text-amber-700 border-amber-200",
-    contacted: "bg-green-100 text-green-700 border-green-200",
-    approved: "bg-blue-100 text-blue-700 border-blue-200",
-    rejected: "bg-red-100 text-red-700 border-red-200",
-  };
-
-  const icons = {
-    pending: <Clock className="w-3 h-3 mr-1" />,
-    contacted: <Check className="w-3 h-3 mr-1" />,
-    approved: <Check className="w-3 h-3 mr-1" />,
-    rejected: <X className="w-3 h-3 mr-1" />,
-  };
-
-  // @ts-ignore
-  const currentStyle = styles[status] || styles.pending;
-  // @ts-ignore
-  const currentIcon = icons[status] || icons.pending;
-
-  return (
-    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center capitalize ${currentStyle}`} data-testid={`badge-status-${status}`}>
-      {currentIcon}
-      {status}
-    </span>
   );
 }

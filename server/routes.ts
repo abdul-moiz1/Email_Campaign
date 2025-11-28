@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { initializeFirebase } from "./firebase";
-import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema, sendEmailSchema, generateEmailSchema, updateEmailSchema } from "@shared/schema";
+import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema, sendEmailSchema, generateEmailSchema, updateEmailSchema, generateEmailFromCampaignSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { getUncachableSendGridClient } from "./sendgrid";
 
@@ -324,6 +324,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: error.message 
         });
       }
+    }
+  });
+
+  // Get all campaigns with their email status
+  app.get("/api/campaigns", async (req, res) => {
+    try {
+      const campaigns = await storage.getAllCampaignsWithEmails();
+      res.json(campaigns);
+    } catch (error) {
+      console.error("Fetch campaigns error:", error);
+      res.status(500).json({ message: "Failed to fetch campaigns" });
+    }
+  });
+
+  // Get email for a specific campaign
+  app.get("/api/campaigns/:id/email", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const email = await storage.getEmailByCampaignId(id);
+      
+      if (!email) {
+        return res.status(404).json({ message: "No email found for this campaign" });
+      }
+      
+      res.json(email);
+    } catch (error) {
+      console.error("Fetch campaign email error:", error);
+      res.status(500).json({ message: "Failed to fetch campaign email" });
+    }
+  });
+
+  // Generate email for a campaign via Make.com webhook
+  app.post("/api/campaigns/:id/generate-email", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const parsed = generateEmailFromCampaignSchema.safeParse({
+        ...req.body,
+        campaignId: id,
+      });
+      
+      if (!parsed.success) {
+        const error = fromZodError(parsed.error);
+        return res.status(400).json({ message: error.message });
+      }
+
+      const { campaignId, businessName, businessEmail, phone, address, mapLink, rating, product } = parsed.data;
+      
+      console.log(`Generating email for campaign ${campaignId} with product: ${product}`);
+      
+      // Get Make.com webhook URL
+      const makeWebhookUrl = process.env.VITE_MAKE_WEBHOOK_URL;
+      const makeApiKey = process.env.MAKE_WEBHOOK_API_KEY;
+      
+      if (!makeWebhookUrl || !makeApiKey) {
+        console.error("Make.com webhook not configured");
+        return res.status(500).json({ 
+          message: "Webhook configuration error. Please contact support."
+        });
+      }
+      
+      // Send to Make.com webhook for AI email generation with the exact payload requested
+      const webhookResponse = await fetch(makeWebhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-make-apikey": makeApiKey,
+        },
+        body: JSON.stringify({
+          source: "admin",
+          campaignId,
+          businessName,
+          businessEmail: businessEmail || '',
+          phone: phone || '',
+          address: address || '',
+          mapLink: mapLink || '',
+          rating: rating || '',
+          product,
+        }),
+      });
+      
+      if (!webhookResponse.ok) {
+        const errorText = await webhookResponse.text();
+        console.error("Make.com webhook error:", webhookResponse.status, errorText);
+        return res.status(502).json({ 
+          message: "Failed to generate email. Please try again."
+        });
+      }
+      
+      console.log("✓ Email generation request sent to Make.com for campaign:", campaignId);
+      
+      res.json({ 
+        message: "Email generation started",
+        campaignId
+      });
+    } catch (error: any) {
+      console.error("Generate campaign email error:", error);
+      res.status(500).json({ 
+        message: "Failed to generate email",
+        error: error.message 
+      });
     }
   });
 

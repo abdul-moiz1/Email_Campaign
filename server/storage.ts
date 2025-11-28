@@ -1,5 +1,5 @@
 import { getFirestore } from "./firebase";
-import type { BusinessSubmission, Submission, UpdateStatus, EnrichedBusinessData, GeneratedEmail, EmailStatus, ProductType } from "@shared/schema";
+import type { BusinessSubmission, Submission, UpdateStatus, EnrichedBusinessData, GeneratedEmail, EmailStatus, ProductType, CampaignData, CampaignWithEmail } from "@shared/schema";
 
 export interface IStorage {
   createSubmission(submission: BusinessSubmission): Promise<Submission>;
@@ -10,6 +10,9 @@ export interface IStorage {
   updateEmailStatus(emailId: string, status: EmailStatus): Promise<void>;
   updateEmailContent(emailId: string, subject: string, body: string): Promise<GeneratedEmail>;
   updateEmailWithGenerated(emailId: string, subject: string, aiEmail: string, selectedProduct: ProductType): Promise<GeneratedEmail>;
+  getAllCampaigns(): Promise<CampaignData[]>;
+  getAllCampaignsWithEmails(): Promise<CampaignWithEmail[]>;
+  getEmailByCampaignId(campaignId: string): Promise<GeneratedEmail | null>;
 }
 
 export class FirestoreStorage implements IStorage {
@@ -110,9 +113,10 @@ export class FirestoreStorage implements IStorage {
       const data = doc.data();
       return {
         id: doc.id,
-        businessName: data.BusinessName || '',
-        address: data.Address || '',
-        businessEmail: data.BusinessEmail || '',
+        campaignId: data.campaignId || undefined,
+        businessName: data.BusinessName || data.businessName || '',
+        address: data.Address || data.address || '',
+        businessEmail: data.BusinessEmail || data.businessEmail || '',
         phoneNumber: data.PhoneNumber || data.phoneNumber || undefined,
         website: data.Website || data.website || undefined,
         selectedProduct: data.selectedProduct || undefined,
@@ -165,9 +169,10 @@ export class FirestoreStorage implements IStorage {
 
     return {
       id: emailId,
-      businessName: existingData.BusinessName || '',
-      address: existingData.Address || '',
-      businessEmail: existingData.BusinessEmail || '',
+      campaignId: existingData.campaignId || undefined,
+      businessName: existingData.BusinessName || existingData.businessName || '',
+      address: existingData.Address || existingData.address || '',
+      businessEmail: existingData.BusinessEmail || existingData.businessEmail || '',
       phoneNumber: existingData.PhoneNumber || existingData.phoneNumber || undefined,
       website: existingData.Website || existingData.website || undefined,
       selectedProduct: existingData.selectedProduct || undefined,
@@ -203,9 +208,10 @@ export class FirestoreStorage implements IStorage {
 
     return {
       id: emailId,
-      businessName: existingData.BusinessName || '',
-      address: existingData.Address || '',
-      businessEmail: existingData.BusinessEmail || '',
+      campaignId: existingData.campaignId || undefined,
+      businessName: existingData.BusinessName || existingData.businessName || '',
+      address: existingData.Address || existingData.address || '',
+      businessEmail: existingData.BusinessEmail || existingData.businessEmail || '',
       phoneNumber: existingData.PhoneNumber || existingData.phoneNumber || undefined,
       website: existingData.Website || existingData.website || undefined,
       selectedProduct: selectedProduct,
@@ -218,6 +224,98 @@ export class FirestoreStorage implements IStorage {
       createdAt: existingData.createdAt?.toDate() || new Date(),
       updatedAt: now,
     } as GeneratedEmail;
+  }
+
+  async getAllCampaigns(): Promise<CampaignData[]> {
+    try {
+      // Try to get with ordering first
+      let snapshot;
+      try {
+        snapshot = await this.db
+          .collection('CampaignData')
+          .orderBy('createdAt', 'desc')
+          .get();
+      } catch (orderError) {
+        // If ordering fails (field doesn't exist), get without ordering
+        console.log('CampaignData: createdAt field not found, fetching without order');
+        snapshot = await this.db
+          .collection('CampaignData')
+          .get();
+      }
+
+      const campaigns = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          businessName: data.businessName || data.BusinessName || data.business_name || '',
+          businessEmail: data.businessEmail || data.BusinessEmail || data.business_email || data.email || undefined,
+          address: data.address || data.Address || undefined,
+          city: data.city || data.City || undefined,
+          mapLink: data.mapLink || data.MapLink || data.map_link || undefined,
+          phone: data.phone || data.Phone || undefined,
+          rating: data.rating || data.Rating || undefined,
+          createdAt: data.createdAt?.toDate() || data.created_at?.toDate() || new Date(),
+        };
+      }) as CampaignData[];
+
+      // Sort in memory if we couldn't sort in the query
+      return campaigns.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      throw error;
+    }
+  }
+
+  async getEmailByCampaignId(campaignId: string): Promise<GeneratedEmail | null> {
+    const snapshot = await this.db
+      .collection('generatedEmails')
+      .where('campaignId', '==', campaignId)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) {
+      return null;
+    }
+
+    const doc = snapshot.docs[0];
+    const data = doc.data();
+
+    return {
+      id: doc.id,
+      campaignId: data.campaignId,
+      businessName: data.BusinessName || data.businessName || '',
+      address: data.Address || data.address || '',
+      businessEmail: data.BusinessEmail || data.businessEmail || '',
+      phoneNumber: data.PhoneNumber || data.phoneNumber || undefined,
+      website: data.Website || data.website || undefined,
+      selectedProduct: data.selectedProduct || undefined,
+      subject: data.subject || undefined,
+      aiEmail: data.AIEmail || data.aiEmail || '',
+      editedSubject: data.editedSubject || undefined,
+      editedBody: data.editedBody || undefined,
+      mapLink: data.MapLink && data.MapLink.trim() !== '' ? data.MapLink : undefined,
+      status: data.status || 'not_generated',
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || undefined,
+    };
+  }
+
+  async getAllCampaignsWithEmails(): Promise<CampaignWithEmail[]> {
+    const campaigns = await this.getAllCampaigns();
+    const emails = await this.getAllGeneratedEmails();
+    
+    const emailsByCampaignId = new Map<string, GeneratedEmail>();
+    for (const email of emails) {
+      if (email.campaignId) {
+        emailsByCampaignId.set(email.campaignId, email);
+      }
+    }
+
+    return campaigns.map(campaign => ({
+      ...campaign,
+      email: emailsByCampaignId.get(campaign.id),
+      hasEmail: emailsByCampaignId.has(campaign.id),
+    }));
   }
 }
 
