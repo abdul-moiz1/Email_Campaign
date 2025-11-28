@@ -1,0 +1,153 @@
+Update my Admin Dashboard to work with two Firestore collections: CampaignData and generatedEmails.
+
+1. Data model
+
+Assume the Firestore collections look like this:
+
+CampaignData (main business data)
+
+id (document id)
+
+businessName
+
+businessEmail
+
+address
+
+city
+
+mapLink
+
+phone
+
+rating
+
+createdAt
+
+generatedEmails
+
+campaignId (matches the CampaignData document id)
+
+businessEmail
+
+product
+
+subject
+
+body
+
+status // e.g. "generated", "edited", "sent"
+
+createdAt
+
+updatedAt
+
+If some field names differ, adapt the code to use the existing ones.
+
+2. Admin list: load businesses from CampaignData
+
+On page load:
+
+Fetch all documents from the CampaignData collection (ordered by createdAt descending).
+
+For each campaign document, create a card showing:
+
+businessName
+
+city / address
+
+businessEmail
+
+phone
+
+rating
+
+“View on Map” link using mapLink
+
+For each card, also check if there is a related email in generatedEmails where
+generatedEmails.campaignId == campaign.id.
+
+You can either:
+
+Use a single query that loads all generatedEmails and map them by campaignId, or
+
+For each card, query generatedEmails for that campaignId.
+
+On each card show:
+
+If an email exists → show badge “Email generated” and a primary button “View / Edit email”
+
+If no email yet → show badge “No email” and a primary button “Generate email”
+
+Keep the styling similar to my current cards.
+
+3. Generate Email button → call Make webhook
+
+On each card, add a product dropdown and Generate Email button:
+
+Product dropdown values:
+
+"AI Calling Agent"
+
+"AI Chatbot"
+
+"Booking Assistant"
+
+"Custom AI Solution"
+
+When the user clicks Generate Email:
+
+Disable the button and show a small loading indicator on that card.
+
+Call my existing Make.com webhook URL with a POST request and JSON body:
+
+{
+  "source": "admin",
+  "campaignId": "<campaign document id>",
+  "businessName": "<from CampaignData>",
+  "businessEmail": "<from CampaignData>",
+  "phone": "<from CampaignData>",
+  "address": "<from CampaignData>",
+  "mapLink": "<from CampaignData>",
+  "rating": "<from CampaignData>",
+  "product": "<selected product from dropdown>"
+}
+
+
+Do not change the webhook URL, just send these fields.
+
+The Make scenario will handle Gemini and save the email into the generatedEmails collection with the matching campaignId.
+
+After the webhook request completes, re-fetch the generatedEmails data for that campaignId and update the card state so it now shows “Email generated” and the View / Edit email button.
+
+4. View / Edit email
+
+When the user clicks “View / Edit email” on a card:
+
+Fetch the corresponding document from generatedEmails where campaignId matches.
+
+Open a modal / drawer that shows:
+
+Subject (editable text input)
+
+Body (editable textarea, multi-line)
+
+Product (read-only or editable select)
+
+Status badge (e.g. “generated”)
+
+Add buttons inside the modal:
+
+Save changes → updates the generatedEmails document in Firestore with edited subject, body, updatedAt and optionally status = "edited".
+
+Close → closes the modal
+
+The card should reflect that an email exists, and optionally show the last updated time.
+
+5. General UI rules
+
+Keep the existing Admin Dashboard style: same fonts, colors, spacing, and card layout.
+
+Use clear labels and simple text.
+
+Handle loading and errors gracefully on Generate / View / Save operations.
