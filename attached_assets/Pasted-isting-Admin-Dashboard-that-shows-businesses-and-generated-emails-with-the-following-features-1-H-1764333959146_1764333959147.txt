@@ -1,0 +1,117 @@
+isting Admin Dashboard that shows businesses and generated emails with the following features:
+
+1. Handle “duplicate” response from the webhook
+
+I already call a Make.com webhook when I scrape or save a business. The webhook response can contain something like:
+
+{ "status": "saved" } for new records
+
+{ "status": "exists" } when the business is already in Firestore (duplicate)
+
+Change my admin frontend so that:
+
+After the webhook call finishes, check response.status.
+
+If response.status === "exists":
+
+Show a small popup / toast at the top-right:
+
+Text: "This business already exists in the database."
+
+Also show a small badge or text on the related card:
+
+"Already exists" (use a neutral or warning color)
+
+If response.status === "saved":
+
+Show a popup / toast:
+
+"Business saved successfully."
+
+Make sure the popup disappears after a few seconds or when the user closes it.
+
+Keep the existing styling consistent with the current admin UI (same fonts, colors, and corner radius).
+
+2. Add “Mark as sent” to generated emails
+
+I have a generatedEmails collection in Firestore. Each email document has at least:
+
+campaignId (or placeId tying it to the business)
+
+businessName
+
+businessEmail
+
+subject
+
+body
+
+status (e.g. "generated", "edited", "sent")
+
+createdAt
+
+updatedAt (optional)
+
+sentAt (optional)
+
+On the Admin page, for each business that already has a generated email:
+
+Show:
+
+Business name
+
+Business email
+
+Current email status (badge): "Generated", "Edited", or "Sent" based on the status field.
+
+A “View / Edit Email” button that opens the subject/body in a modal or panel (this may already exist; keep it).
+
+Inside that email modal/panel, add a “Mark as sent” button.
+
+Behaviour:
+
+Only show “Mark as sent” if status is not already "sent".
+
+When clicked:
+
+Update the corresponding generatedEmails document in Firestore:
+
+status = "sent"
+
+sentAt = current timestamp
+
+After successful update:
+
+Update the UI state so the status badge shows "Sent".
+
+Disable or hide the “Mark as sent” button.
+
+Show a small confirmation toast: "Email marked as sent."
+
+If status === "sent":
+
+Show a green “Sent” badge on the card.
+
+Do not allow editing the status back from the UI (view only).
+
+Keep the email body still viewable, but “Mark as sent” should be disabled or hidden.
+
+3. General UI rules
+
+Do not break existing routing or Firestore queries.
+
+Reuse my existing Firebase config.
+
+Keep all components in the same style as the current admin page (no new design system).
+
+Handle loading and error states on:
+
+Webhook calls
+
+Firestore updates for status / sentAt
+
+In short:
+
+Show a clear "Already exists" message when Make/Firestore says the business is duplicate.
+
+Add a proper “Mark as sent” flow that updates Firestore and the UI for generated emails.
