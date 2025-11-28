@@ -15,6 +15,31 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
 
 type FilterMode = 'all' | 'withEmail' | 'withoutEmail';
+type BusinessTypeFilter = 'all' | 'restaurant' | 'dental' | 'retail' | 'medical' | 'automotive' | 'other';
+
+const businessTypeKeywords: Record<Exclude<BusinessTypeFilter, 'all' | 'other'>, string[]> = {
+  restaurant: ['restaurant', 'cafe', 'coffee', 'pizza', 'food', 'dining', 'bistro', 'grill', 'kitchen', 'bakery', 'bar', 'pub', 'sushi', 'thai', 'chinese', 'indian', 'mexican', 'italian', 'deli', 'superstore', 'grocery'],
+  dental: ['dental', 'dentist', 'orthodont', 'teeth', 'oral', 'smile'],
+  retail: ['store', 'shop', 'boutique', 'mart', 'outlet', 'retail', 'mall'],
+  medical: ['medical', 'clinic', 'hospital', 'health', 'doctor', 'physician', 'pharmacy', 'physio', 'chiro'],
+  automotive: ['auto', 'car', 'vehicle', 'tire', 'mechanic', 'repair', 'motor', 'garage'],
+};
+
+function detectBusinessType(businessName: string): BusinessTypeFilter {
+  const lowerName = businessName.toLowerCase();
+  for (const [type, keywords] of Object.entries(businessTypeKeywords)) {
+    if (keywords.some(keyword => lowerName.includes(keyword))) {
+      return type as BusinessTypeFilter;
+    }
+  }
+  return 'other';
+}
+
+function isValidEmail(email: string | undefined): boolean {
+  if (!email) return false;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
 
 function extractCityCountry(address: string | undefined): string {
   if (!address) return '';
@@ -88,19 +113,28 @@ export default function Admin() {
   const [editedSubject, setEditedSubject] = useState("");
   const [editedBody, setEditedBody] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [businessTypeFilter, setBusinessTypeFilter] = useState<BusinessTypeFilter>('all');
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const filteredCampaigns = useMemo(() => {
+    let result = campaigns;
+    
     switch (filterMode) {
       case 'withEmail':
-        return campaigns.filter(c => c.hasEmail && c.email && c.email.aiEmail && c.email.aiEmail.trim() !== '');
+        result = result.filter(c => c.hasEmail && c.email && c.email.aiEmail && c.email.aiEmail.trim() !== '');
+        break;
       case 'withoutEmail':
-        return campaigns.filter(c => !c.hasEmail || !c.email || !c.email.aiEmail || c.email.aiEmail.trim() === '');
-      default:
-        return campaigns;
+        result = result.filter(c => !c.hasEmail || !c.email || !c.email.aiEmail || c.email.aiEmail.trim() === '');
+        break;
     }
-  }, [campaigns, filterMode]);
+    
+    if (businessTypeFilter !== 'all') {
+      result = result.filter(c => detectBusinessType(c.businessName) === businessTypeFilter);
+    }
+    
+    return result;
+  }, [campaigns, filterMode, businessTypeFilter]);
 
   useEffect(() => {
     setSelectedCampaignIds(prev => {
@@ -497,6 +531,21 @@ export default function Admin() {
                       <SelectItem value="withoutEmail">No Email</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select value={businessTypeFilter} onValueChange={(value: BusinessTypeFilter) => setBusinessTypeFilter(value)}>
+                    <SelectTrigger className="w-[150px]" data-testid="select-business-type">
+                      <Building2 className="w-4 h-4 mr-2 text-slate-500" />
+                      <SelectValue placeholder="Business Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="restaurant">Restaurant</SelectItem>
+                      <SelectItem value="dental">Dental</SelectItem>
+                      <SelectItem value="retail">Retail</SelectItem>
+                      <SelectItem value="medical">Medical</SelectItem>
+                      <SelectItem value="automotive">Automotive</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <span className="text-sm text-slate-500">
                     {filteredCampaigns.length} of {campaigns.length}
                   </span>
@@ -579,7 +628,7 @@ export default function Admin() {
                         </div>
                       )}
 
-                      {campaign.businessEmail && (
+                      {isValidEmail(campaign.businessEmail) && (
                         <div className="flex items-center gap-2 text-slate-500">
                           <Mail className="w-3.5 h-3.5 flex-shrink-0" />
                           <span className="truncate">{campaign.businessEmail}</span>
@@ -878,9 +927,6 @@ export default function Admin() {
                                     email: result.email
                                   } : null);
                                   
-                                  // Also set selectedEmail so Send Email flow works
-                                  setSelectedEmail(result.email);
-                                  
                                   toast({
                                     title: "Email saved",
                                     description: "Your changes have been saved.",
@@ -1032,7 +1078,7 @@ export default function Admin() {
                 </DialogHeader>
                 
                 <div className="space-y-6 mt-4">
-                  {selectedEmail.businessEmail && (
+                  {isValidEmail(selectedEmail.businessEmail) && (
                     <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                       <div className="flex items-center gap-2">
                         <Mail className="w-5 h-5 text-blue-600 flex-shrink-0" />
@@ -1041,6 +1087,17 @@ export default function Admin() {
                           <a href={`mailto:${selectedEmail.businessEmail}`} className="text-blue-700 hover:underline font-semibold text-lg" data-testid="link-email">
                             {selectedEmail.businessEmail}
                           </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {!isValidEmail(selectedEmail.businessEmail) && (
+                    <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                        <div>
+                          <div className="text-xs text-amber-600 font-medium mb-1">Contact Email</div>
+                          <span className="text-amber-700 font-medium">No valid email address</span>
                         </div>
                       </div>
                     </div>
