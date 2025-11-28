@@ -166,7 +166,7 @@ export const generateEmailFromCampaignSchema = z.object({
   address: z.string().optional(),
   mapLink: z.string().optional(),
   rating: z.union([z.string(), z.number()]).optional(),
-  product: z.enum(['AI Calling Agent', 'AI Chatbot', 'Booking Assistant', 'Custom AI Solution']),
+  product: z.string().min(1, "Product is required"),
 });
 
 export type GenerateEmailFromCampaign = z.infer<typeof generateEmailFromCampaignSchema>;

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +12,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
+
+function extractCityCountry(address: string | undefined): string {
+  if (!address) return '';
+  const parts = address.split(',').map(p => p.trim());
+  if (parts.length >= 2) {
+    const country = parts[parts.length - 1];
+    const cityPart = parts.length >= 3 ? parts[parts.length - 3] : parts[0];
+    return `${cityPart}, ${country}`;
+  }
+  return address;
+}
 
 interface GeneratedEmail {
   id: string;
@@ -63,11 +74,14 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [selectedEmail, setSelectedEmail] = useState<GeneratedEmail | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignWithEmail | null>(null);
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
   const [showNoEmailAlert, setShowNoEmailAlert] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState<Record<string, ProductType>>({});
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, string>>({});
+  const [customProducts, setCustomProducts] = useState<Record<string, string>>({});
+  const [showCustomInput, setShowCustomInput] = useState<Record<string, boolean>>({});
   const [editedSubject, setEditedSubject] = useState("");
   const [editedBody, setEditedBody] = useState("");
   const { toast } = useToast();
@@ -123,8 +137,27 @@ export default function Admin() {
     fetchSubmissions();
   }, []);
 
+  const getSelectedProduct = (campaignId: string): string => {
+    const selected = selectedProducts[campaignId];
+    if (selected === 'custom') {
+      const customProduct = customProducts[campaignId]?.trim() || '';
+      return customProduct;
+    }
+    return selected || '';
+  };
+
+  const isGenerateDisabled = (campaignId: string): boolean => {
+    const selected = selectedProducts[campaignId];
+    if (!selected) return true;
+    if (selected === 'custom') {
+      const customProduct = customProducts[campaignId]?.trim() || '';
+      return customProduct.length === 0;
+    }
+    return false;
+  };
+
   const handleGenerateEmail = async (campaign: CampaignWithEmail) => {
-    const selectedProduct = selectedProducts[campaign.id];
+    const selectedProduct = getSelectedProduct(campaign.id);
     
     if (!selectedProduct) {
       toast({
@@ -391,7 +424,8 @@ export default function Admin() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-slate-100 flex flex-col"
+                  className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-slate-100 flex flex-col cursor-pointer"
+                  onClick={() => setSelectedCampaign(campaign)}
                   data-testid={`card-campaign-${campaign.id}`}
                 >
                   <div className="p-6 flex-1">
@@ -410,11 +444,11 @@ export default function Admin() {
                     </div>
                     
                     <div className="space-y-3">
-                      {(campaign.city || campaign.address) && (
+                      {campaign.address && (
                         <div className="flex items-center space-x-2 text-slate-600">
                           <MapPin className="w-4 h-4 flex-shrink-0" />
                           <div className="text-sm truncate">
-                            {campaign.city || campaign.address}
+                            {extractCityCountry(campaign.address)}
                           </div>
                         </div>
                       )}
@@ -433,28 +467,6 @@ export default function Admin() {
                         </div>
                       )}
 
-                      {campaign.rating && (
-                        <div className="flex items-center space-x-2 text-slate-600">
-                          <Star className="w-4 h-4 flex-shrink-0 text-yellow-500" />
-                          <span className="text-sm">{campaign.rating}</span>
-                        </div>
-                      )}
-
-                      {campaign.mapLink && (
-                        <div className="flex items-center space-x-2">
-                          <ExternalLink className="w-4 h-4 flex-shrink-0 text-slate-500" />
-                          <a 
-                            href={campaign.mapLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-sm text-blue-600 hover:underline"
-                            data-testid={`link-map-${campaign.id}`}
-                          >
-                            View on Map
-                          </a>
-                        </div>
-                      )}
-
                       <div className="pt-3 border-t border-slate-100">
                         <div className="text-xs text-slate-400">
                           Added {new Date(campaign.createdAt).toLocaleDateString('en-US', { 
@@ -468,27 +480,51 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    <div className="mt-4 space-y-3">
-                      <Select 
-                        value={selectedProducts[campaign.id] || campaign.email?.selectedProduct || ""} 
-                        onValueChange={(value) => setSelectedProducts({...selectedProducts, [campaign.id]: value as ProductType})}
-                      >
-                        <SelectTrigger className="w-full" data-testid={`select-product-${campaign.id}`}>
-                          <SelectValue placeholder="Select Product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {productTypes.map((product) => (
-                            <SelectItem key={product} value={product}>
-                              {product}
+                    <div className="mt-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="space-y-2">
+                        <Select 
+                          value={selectedProducts[campaign.id] || campaign.email?.selectedProduct || ""} 
+                          onValueChange={(value) => {
+                            setSelectedProducts({...selectedProducts, [campaign.id]: value});
+                            if (value === 'custom') {
+                              setShowCustomInput({...showCustomInput, [campaign.id]: true});
+                            } else {
+                              setShowCustomInput({...showCustomInput, [campaign.id]: false});
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full" data-testid={`select-product-${campaign.id}`}>
+                            <SelectValue placeholder="Select Product" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {productTypes.map((product) => (
+                              <SelectItem key={product} value={product}>
+                                {product}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="custom">
+                              <span className="flex items-center gap-1">
+                                <Plus className="w-3 h-3" />
+                                Custom Product...
+                              </span>
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          </SelectContent>
+                        </Select>
+
+                        {showCustomInput[campaign.id] && (
+                          <Input
+                            placeholder="Enter custom product name..."
+                            value={customProducts[campaign.id] || ''}
+                            onChange={(e) => setCustomProducts({...customProducts, [campaign.id]: e.target.value})}
+                            data-testid={`input-custom-product-${campaign.id}`}
+                          />
+                        )}
+                      </div>
 
                       <div className="flex gap-2">
                         {campaign.hasEmail && hasEmailContent(campaign.email) ? (
                           <Button
-                            onClick={() => campaign.email && openEmailModal(campaign.email)}
+                            onClick={(e) => { e.stopPropagation(); campaign.email && openEmailModal(campaign.email); }}
                             className="flex-1"
                             variant="default"
                             data-testid={`button-view-email-${campaign.id}`}
@@ -498,8 +534,8 @@ export default function Admin() {
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => handleGenerateEmail(campaign)}
-                            disabled={generating === campaign.id || !selectedProducts[campaign.id]}
+                            onClick={(e) => { e.stopPropagation(); handleGenerateEmail(campaign); }}
+                            disabled={generating === campaign.id || isGenerateDisabled(campaign.id)}
                             className="flex-1"
                             variant="default"
                             data-testid={`button-generate-${campaign.id}`}
@@ -600,6 +636,177 @@ export default function Admin() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={selectedCampaign !== null} onOpenChange={() => setSelectedCampaign(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogDescription className="sr-only">
+              Campaign details for {selectedCampaign?.businessName}
+            </DialogDescription>
+            {selectedCampaign && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                    <Building2 className="w-6 h-6 text-blue-600" />
+                    {selectedCampaign.businessName}
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-6 mt-4">
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    {selectedCampaign.address && (
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 mt-0.5 text-slate-500 flex-shrink-0" />
+                        <div className="text-slate-600 text-sm">{selectedCampaign.address}</div>
+                      </div>
+                    )}
+                    
+                    {selectedCampaign.businessEmail && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                        <a href={`mailto:${selectedCampaign.businessEmail}`} className="text-blue-600 hover:underline text-sm">
+                          {selectedCampaign.businessEmail}
+                        </a>
+                      </div>
+                    )}
+                    
+                    {selectedCampaign.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                        <a href={`tel:${selectedCampaign.phone}`} className="text-slate-600 hover:underline text-sm">
+                          {selectedCampaign.phone}
+                        </a>
+                      </div>
+                    )}
+
+                    {selectedCampaign.rating && (
+                      <div className="flex items-center gap-2">
+                        <Star className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                        <span className="text-slate-600 text-sm">{selectedCampaign.rating} rating</span>
+                      </div>
+                    )}
+                    
+                    {selectedCampaign.mapLink && (
+                      <div className="flex items-center gap-2">
+                        <ExternalLink className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                        <a href={selectedCampaign.mapLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                          View on Google Maps
+                        </a>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-200">
+                      <div className="text-xs text-slate-400">
+                        Added {new Date(selectedCampaign.createdAt).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedCampaign.hasEmail && selectedCampaign.email ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-slate-700">Email Status</span>
+                        {getEmailStatusBadge(selectedCampaign.email.status)}
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (selectedCampaign.email) {
+                            openEmailModal(selectedCampaign.email);
+                            setSelectedCampaign(null);
+                          }
+                        }}
+                        className="w-full"
+                        data-testid="button-modal-view-email"
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        View / Edit Email
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">Select Product</label>
+                        <Select 
+                          value={selectedProducts[selectedCampaign.id] || ""} 
+                          onValueChange={(value) => {
+                            setSelectedProducts({...selectedProducts, [selectedCampaign.id]: value});
+                            if (value === 'custom') {
+                              setShowCustomInput({...showCustomInput, [selectedCampaign.id]: true});
+                            } else {
+                              setShowCustomInput({...showCustomInput, [selectedCampaign.id]: false});
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full" data-testid="modal-select-product">
+                            <SelectValue placeholder="Select Product" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {productTypes.map((product) => (
+                              <SelectItem key={product} value={product}>
+                                {product}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="custom">
+                              <span className="flex items-center gap-1">
+                                <Plus className="w-3 h-3" />
+                                Custom Product...
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {showCustomInput[selectedCampaign.id] && (
+                          <Input
+                            placeholder="Enter custom product name..."
+                            value={customProducts[selectedCampaign.id] || ''}
+                            onChange={(e) => setCustomProducts({...customProducts, [selectedCampaign.id]: e.target.value})}
+                            data-testid="modal-input-custom-product"
+                          />
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={() => {
+                          handleGenerateEmail(selectedCampaign);
+                          setSelectedCampaign(null);
+                        }}
+                        disabled={generating === selectedCampaign.id || isGenerateDisabled(selectedCampaign.id)}
+                        className="w-full"
+                        data-testid="modal-button-generate"
+                      >
+                        {generating === selectedCampaign.id ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Generate Email
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={() => setSelectedCampaign(null)}
+                    variant="outline"
+                    className="w-full"
+                    data-testid="button-close-campaign-modal"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={selectedEmail !== null} onOpenChange={() => setSelectedEmail(null)}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
