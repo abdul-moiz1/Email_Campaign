@@ -34,6 +34,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
@@ -43,10 +48,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    if (!auth) {
+      throw new Error("Firebase authentication is not configured");
+    }
     await signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
+    if (!auth) {
+      throw new Error("Firebase authentication is not configured");
+    }
     await signOut(auth);
   };
 
