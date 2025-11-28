@@ -1,5 +1,5 @@
 import { getFirestore } from "./firebase";
-import type { BusinessSubmission, Submission, UpdateStatus, EnrichedBusinessData, GeneratedEmail } from "@shared/schema";
+import type { BusinessSubmission, Submission, UpdateStatus, EnrichedBusinessData, GeneratedEmail, EmailStatus, ProductType } from "@shared/schema";
 
 export interface IStorage {
   createSubmission(submission: BusinessSubmission): Promise<Submission>;
@@ -7,7 +7,9 @@ export interface IStorage {
   updateSubmissionStatus(id: string, status: UpdateStatus): Promise<Submission>;
   updateEnrichedData(id: string, enrichedData: EnrichedBusinessData): Promise<Submission>;
   getAllGeneratedEmails(): Promise<GeneratedEmail[]>;
-  updateEmailStatus(emailId: string, status: 'pending' | 'approved' | 'sent'): Promise<void>;
+  updateEmailStatus(emailId: string, status: EmailStatus): Promise<void>;
+  updateEmailContent(emailId: string, subject: string, body: string): Promise<GeneratedEmail>;
+  updateEmailWithGenerated(emailId: string, subject: string, aiEmail: string, selectedProduct: ProductType): Promise<GeneratedEmail>;
 }
 
 export class FirestoreStorage implements IStorage {
@@ -111,10 +113,17 @@ export class FirestoreStorage implements IStorage {
         businessName: data.BusinessName || '',
         address: data.Address || '',
         businessEmail: data.BusinessEmail || '',
-        aiEmail: data.AIEmail || '',
+        phoneNumber: data.PhoneNumber || data.phoneNumber || undefined,
+        website: data.Website || data.website || undefined,
+        selectedProduct: data.selectedProduct || undefined,
+        subject: data.subject || undefined,
+        aiEmail: data.AIEmail || data.aiEmail || '',
+        editedSubject: data.editedSubject || undefined,
+        editedBody: data.editedBody || undefined,
         mapLink: data.MapLink && data.MapLink.trim() !== '' ? data.MapLink : undefined,
-        status: data.status || 'pending',
+        status: data.status || 'not_generated',
         createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || undefined,
       };
     }) as GeneratedEmail[];
 
@@ -122,7 +131,7 @@ export class FirestoreStorage implements IStorage {
     return emails.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async updateEmailStatus(emailId: string, status: 'pending' | 'approved' | 'sent'): Promise<void> {
+  async updateEmailStatus(emailId: string, status: EmailStatus): Promise<void> {
     const docRef = this.db.collection('generatedEmails').doc(emailId);
     const doc = await docRef.get();
 
@@ -134,6 +143,81 @@ export class FirestoreStorage implements IStorage {
       status,
       updatedAt: new Date(),
     });
+  }
+
+  async updateEmailContent(emailId: string, subject: string, body: string): Promise<GeneratedEmail> {
+    const docRef = this.db.collection('generatedEmails').doc(emailId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      throw new Error('Email not found');
+    }
+
+    const existingData = doc.data()!;
+    const now = new Date();
+
+    await docRef.update({
+      editedSubject: subject,
+      editedBody: body,
+      status: 'edited',
+      updatedAt: now,
+    });
+
+    return {
+      id: emailId,
+      businessName: existingData.BusinessName || '',
+      address: existingData.Address || '',
+      businessEmail: existingData.BusinessEmail || '',
+      phoneNumber: existingData.PhoneNumber || existingData.phoneNumber || undefined,
+      website: existingData.Website || existingData.website || undefined,
+      selectedProduct: existingData.selectedProduct || undefined,
+      subject: existingData.subject || undefined,
+      aiEmail: existingData.AIEmail || existingData.aiEmail || '',
+      editedSubject: subject,
+      editedBody: body,
+      mapLink: existingData.MapLink && existingData.MapLink.trim() !== '' ? existingData.MapLink : undefined,
+      status: 'edited',
+      createdAt: existingData.createdAt?.toDate() || new Date(),
+      updatedAt: now,
+    } as GeneratedEmail;
+  }
+
+  async updateEmailWithGenerated(emailId: string, subject: string, aiEmail: string, selectedProduct: ProductType): Promise<GeneratedEmail> {
+    const docRef = this.db.collection('generatedEmails').doc(emailId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      throw new Error('Email not found');
+    }
+
+    const existingData = doc.data()!;
+    const now = new Date();
+
+    await docRef.update({
+      subject,
+      AIEmail: aiEmail,
+      selectedProduct,
+      status: 'generated',
+      updatedAt: now,
+    });
+
+    return {
+      id: emailId,
+      businessName: existingData.BusinessName || '',
+      address: existingData.Address || '',
+      businessEmail: existingData.BusinessEmail || '',
+      phoneNumber: existingData.PhoneNumber || existingData.phoneNumber || undefined,
+      website: existingData.Website || existingData.website || undefined,
+      selectedProduct: selectedProduct,
+      subject: subject,
+      aiEmail: aiEmail,
+      editedSubject: existingData.editedSubject || undefined,
+      editedBody: existingData.editedBody || undefined,
+      mapLink: existingData.MapLink && existingData.MapLink.trim() !== '' ? existingData.MapLink : undefined,
+      status: 'generated',
+      createdAt: existingData.createdAt?.toDate() || new Date(),
+      updatedAt: now,
+    } as GeneratedEmail;
   }
 }
 

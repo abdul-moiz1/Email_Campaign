@@ -1,11 +1,16 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, ChevronDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
 
 interface Submission {
   id: string;
@@ -23,10 +28,17 @@ interface GeneratedEmail {
   businessName: string;
   address: string;
   businessEmail: string;
+  phoneNumber?: string;
+  website?: string;
+  selectedProduct?: ProductType;
+  subject?: string;
   aiEmail: string;
+  editedSubject?: string;
+  editedBody?: string;
   mapLink?: string;
-  status: 'pending' | 'approved' | 'sent';
+  status: EmailStatus;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export default function Admin() {
@@ -37,7 +49,12 @@ export default function Admin() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<GeneratedEmail | null>(null);
   const [sending, setSending] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState<string | null>(null);
   const [showNoEmailAlert, setShowNoEmailAlert] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, ProductType>>({});
+  const [editedSubject, setEditedSubject] = useState("");
+  const [editedBody, setEditedBody] = useState("");
   const { toast } = useToast();
 
   const fetchSubmissions = async () => {
@@ -127,10 +144,113 @@ export default function Admin() {
     }
   };
 
+  const handleGenerateEmail = async (email: GeneratedEmail) => {
+    const selectedProduct = selectedProducts[email.id];
+    
+    if (!selectedProduct) {
+      toast({
+        title: "Select a product",
+        description: "Please select a product before generating the email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGenerating(email.id);
+    
+    try {
+      const response = await fetch("/api/emails/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          emailId: email.id,
+          businessName: email.businessName,
+          businessEmail: email.businessEmail || undefined,
+          phoneNumber: email.phoneNumber || undefined,
+          selectedProduct,
+          address: email.address,
+          website: email.website || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to generate email");
+      }
+
+      const result = await response.json();
+      
+      setGeneratedEmails(generatedEmails.map(e => 
+        e.id === email.id ? result.email : e
+      ));
+      
+      toast({
+        title: "Email generated",
+        description: "AI-generated email is ready for review.",
+      });
+    } catch (error: any) {
+      console.error("Generate error:", error);
+      toast({
+        title: "Generation failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  const handleSaveEmail = async () => {
+    if (!selectedEmail) return;
+
+    setSaving(true);
+    
+    try {
+      const response = await fetch(`/api/emails/${selectedEmail.id}/update`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          subject: editedSubject,
+          body: editedBody,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to save email");
+      }
+
+      const result = await response.json();
+      
+      setGeneratedEmails(generatedEmails.map(e => 
+        e.id === selectedEmail.id ? result.email : e
+      ));
+      
+      setSelectedEmail(result.email);
+      
+      toast({
+        title: "Email saved",
+        description: "Your changes have been saved.",
+      });
+    } catch (error: any) {
+      console.error("Save error:", error);
+      toast({
+        title: "Save failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSendEmail = async () => {
     if (!selectedEmail) return;
 
-    // Check if recipient email exists
     if (!selectedEmail.businessEmail || selectedEmail.businessEmail.trim() === '') {
       setShowNoEmailAlert(true);
       return;
@@ -147,8 +267,8 @@ export default function Admin() {
         body: JSON.stringify({
           emailId: selectedEmail.id,
           recipientEmail: selectedEmail.businessEmail,
-          subject: "Personalized Business Opportunity",
-          body: selectedEmail.aiEmail,
+          subject: editedSubject || selectedEmail.subject || "Business Opportunity",
+          body: editedBody || selectedEmail.aiEmail,
         }),
       });
 
@@ -157,11 +277,8 @@ export default function Admin() {
         throw new Error(error.message || "Failed to send email");
       }
 
-      const result = await response.json();
-      
-      // Update local state to reflect sent status
       setGeneratedEmails(generatedEmails.map(e => 
-        e.id === selectedEmail.id ? { ...e, status: 'sent' } : e
+        e.id === selectedEmail.id ? { ...e, status: 'sent' as EmailStatus } : e
       ));
       
       toast({
@@ -169,7 +286,6 @@ export default function Admin() {
         description: `Email sent to ${selectedEmail.businessEmail}`,
       });
       
-      // Close modal
       setSelectedEmail(null);
     } catch (error: any) {
       console.error("Send email error:", error);
@@ -181,6 +297,46 @@ export default function Admin() {
     } finally {
       setSending(false);
     }
+  };
+
+  const openEmailModal = (email: GeneratedEmail) => {
+    setSelectedEmail(email);
+    setEditedSubject(email.editedSubject || email.subject || "");
+    setEditedBody(email.editedBody || email.aiEmail || "");
+  };
+
+  const getStatusBadge = (status: EmailStatus) => {
+    const styles = {
+      not_generated: "bg-slate-100 text-slate-600 border-slate-200",
+      generated: "bg-blue-100 text-blue-700 border-blue-200",
+      edited: "bg-amber-100 text-amber-700 border-amber-200",
+      sent: "bg-green-100 text-green-700 border-green-200",
+    };
+
+    const labels = {
+      not_generated: "Not Generated",
+      generated: "Generated",
+      edited: "Edited",
+      sent: "Sent",
+    };
+
+    const icons = {
+      not_generated: <Clock className="w-3 h-3 mr-1" />,
+      generated: <Sparkles className="w-3 h-3 mr-1" />,
+      edited: <Save className="w-3 h-3 mr-1" />,
+      sent: <Check className="w-3 h-3 mr-1" />,
+    };
+
+    return (
+      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center ${styles[status]}`} data-testid={`badge-status-${status}`}>
+        {icons[status]}
+        {labels[status]}
+      </span>
+    );
+  };
+
+  const hasEmailContent = (email: GeneratedEmail) => {
+    return email.aiEmail && email.aiEmail.trim() !== '';
   };
 
   return (
@@ -195,27 +351,25 @@ export default function Admin() {
             <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">Admin Dashboard</h1>
             <p className="text-slate-500 text-lg">Review submissions and AI-generated emails</p>
           </div>
-          <div className="flex gap-2">
-            <button
+          <div className="flex gap-2 flex-wrap">
+            <Button
               onClick={() => {
                 fetchSubmissions();
                 fetchGeneratedEmails();
               }}
               disabled={loading || loadingEmails}
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm disabled:opacity-50"
+              variant="outline"
               data-testid="button-refresh"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${(loading || loadingEmails) ? 'animate-spin' : ''}`} />
               Refresh
-            </button>
-            <Link 
-              href="/" 
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm" 
-              data-testid="link-back-form"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Form
-            </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/" data-testid="link-back-form">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Form
+              </Link>
+            </Button>
           </div>
         </motion.div>
 
@@ -253,14 +407,16 @@ export default function Admin() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  onClick={() => setSelectedEmail(email)}
-                  className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-slate-100 cursor-pointer flex flex-col"
+                  className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-slate-100 flex flex-col"
                   data-testid={`card-email-${email.id}`}
                 >
                   <div className="p-6 flex-1">
-                    <div className="flex items-center space-x-2 text-blue-600 mb-4">
-                      <Building2 className="w-5 h-5 flex-shrink-0" />
-                      <h3 className="font-semibold text-lg text-slate-900">{email.businessName}</h3>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-2 text-blue-600">
+                        <Building2 className="w-5 h-5 flex-shrink-0" />
+                        <h3 className="font-semibold text-lg text-slate-900">{email.businessName}</h3>
+                      </div>
+                      {getStatusBadge(email.status)}
                     </div>
                     
                     <div className="space-y-3">
@@ -271,16 +427,13 @@ export default function Admin() {
                             try {
                               const parts = email.address.split(',').map(p => p.trim());
                               if (parts.length >= 3) {
-                                // Extract city (third from end), province (second from end - first word), country (last)
                                 const country = parts[parts.length - 1];
                                 const provinceSection = parts[parts.length - 2].split(' ');
-                                const province = provinceSection[0]; // First word is usually province code
+                                const province = provinceSection[0];
                                 const city = parts[parts.length - 3];
                                 return `${city}, ${province}, ${country}`;
                               }
-                            } catch (e) {
-                              // Fallback to full address if parsing fails
-                            }
+                            } catch (e) {}
                             return email.address;
                           })()}
                         </div>
@@ -290,6 +443,22 @@ export default function Admin() {
                         <div className="flex items-center space-x-2 text-slate-600">
                           <Mail className="w-4 h-4 flex-shrink-0" />
                           <span className="text-sm truncate">{email.businessEmail}</span>
+                        </div>
+                      )}
+
+                      {email.phoneNumber && (
+                        <div className="flex items-center space-x-2 text-slate-600">
+                          <Phone className="w-4 h-4 flex-shrink-0" />
+                          <span className="text-sm">{email.phoneNumber}</span>
+                        </div>
+                      )}
+
+                      {email.website && (
+                        <div className="flex items-center space-x-2 text-slate-600">
+                          <Globe className="w-4 h-4 flex-shrink-0" />
+                          <a href={email.website} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline truncate">
+                            {email.website}
+                          </a>
                         </div>
                       )}
 
@@ -305,11 +474,59 @@ export default function Admin() {
                         </div>
                       </div>
                     </div>
+
+                    <div className="mt-4 space-y-3">
+                      <Select 
+                        value={selectedProducts[email.id] || email.selectedProduct || ""} 
+                        onValueChange={(value) => setSelectedProducts({...selectedProducts, [email.id]: value as ProductType})}
+                      >
+                        <SelectTrigger className="w-full" data-testid={`select-product-${email.id}`}>
+                          <SelectValue placeholder="Select Product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {productTypes.map((product) => (
+                            <SelectItem key={product} value={product}>
+                              {product}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGenerateEmail(email);
+                          }}
+                          disabled={generating === email.id || !selectedProducts[email.id]}
+                          className="flex-1"
+                          variant="default"
+                          data-testid={`button-generate-${email.id}`}
+                        >
+                          {generating === email.id ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Generate Email
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="p-4 bg-blue-50 border-t border-blue-100 text-center">
-                    <p className="text-sm text-blue-700 font-medium">Click to review email</p>
-                  </div>
+                  {hasEmailContent(email) && (
+                    <div 
+                      className="p-4 bg-blue-50 border-t border-blue-100 text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                      onClick={() => openEmailModal(email)}
+                    >
+                      <p className="text-sm text-blue-700 font-medium">Click to review & edit email</p>
+                    </div>
+                  )}
                 </motion.div>
               ))}
             </div>
@@ -377,7 +594,6 @@ export default function Admin() {
           </TabsContent>
         </Tabs>
 
-        {/* No Email Alert Dialog */}
         <AlertDialog open={showNoEmailAlert} onOpenChange={setShowNoEmailAlert}>
           <AlertDialogContent data-testid="alert-no-email">
             <AlertDialogHeader>
@@ -392,9 +608,11 @@ export default function Admin() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Email Review Modal */}
         <Dialog open={selectedEmail !== null} onOpenChange={() => setSelectedEmail(null)}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogDescription className="sr-only">
+              Review and edit AI-generated email for {selectedEmail?.businessName}
+            </DialogDescription>
             {selectedEmail && (
               <>
                 <DialogHeader>
@@ -405,7 +623,6 @@ export default function Admin() {
                 </DialogHeader>
                 
                 <div className="space-y-6 mt-4">
-                  {/* Email at the top */}
                   {selectedEmail.businessEmail && (
                     <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                       <div className="flex items-center gap-2">
@@ -420,20 +637,35 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {/* Business Info */}
                   <div className="bg-slate-50 rounded-lg p-4 space-y-3">
                     <h3 className="font-semibold text-lg flex items-center gap-2">
                       <Building2 className="w-5 h-5 text-blue-600" />
                       {selectedEmail.businessName}
                     </h3>
                     
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="flex items-start gap-2">
                         <MapPin className="w-4 h-4 mt-0.5 text-slate-500 flex-shrink-0" />
                         <div className="text-slate-600 text-sm">
                           {selectedEmail.address}
                         </div>
                       </div>
+                      
+                      {selectedEmail.phoneNumber && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                          <span className="text-slate-600 text-sm">{selectedEmail.phoneNumber}</span>
+                        </div>
+                      )}
+                      
+                      {selectedEmail.website && (
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                          <a href={selectedEmail.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                            {selectedEmail.website}
+                          </a>
+                        </div>
+                      )}
                       
                       {selectedEmail.mapLink && (
                         <div className="flex items-center gap-2">
@@ -444,50 +676,90 @@ export default function Admin() {
                         </div>
                       )}
                     </div>
+
+                    {selectedEmail.selectedProduct && (
+                      <div className="pt-2 border-t border-slate-200">
+                        <span className="text-xs text-slate-500">Product: </span>
+                        <span className="text-sm font-medium text-slate-700">{selectedEmail.selectedProduct}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* AI Generated Email Content */}
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-semibold text-slate-700 mb-1 block">AI Generated Email</label>
-                      <div className="bg-white border border-slate-200 rounded-lg p-4 text-slate-700 whitespace-pre-wrap min-h-[200px]" data-testid="text-email-body">
-                        {selectedEmail.aiEmail}
-                      </div>
+                      <label className="text-sm font-semibold text-slate-700 mb-2 block">Email Subject</label>
+                      <Input
+                        value={editedSubject}
+                        onChange={(e) => setEditedSubject(e.target.value)}
+                        placeholder="Enter email subject..."
+                        className="w-full"
+                        data-testid="input-email-subject"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-semibold text-slate-700 mb-2 block">Email Body</label>
+                      <Textarea
+                        value={editedBody}
+                        onChange={(e) => setEditedBody(e.target.value)}
+                        placeholder="Enter email body..."
+                        className="w-full min-h-[250px] resize-none"
+                        data-testid="input-email-body"
+                      />
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex gap-3 pt-4 border-t">
-                    <button
+                    <Button
                       onClick={() => setSelectedEmail(null)}
-                      className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                      variant="outline"
+                      className="flex-1"
                       data-testid="button-close-modal"
                     >
                       Close
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      onClick={handleSaveEmail}
+                      disabled={saving || !editedSubject || !editedBody}
+                      variant="secondary"
+                      className="flex-1"
+                      data-testid="button-save-email"
+                    >
+                      {saving ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                    <Button
                       onClick={handleSendEmail}
-                      disabled={sending || selectedEmail?.status === 'sent'}
-                      className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={sending || selectedEmail.status === 'sent' || !hasEmailContent(selectedEmail)}
+                      className="flex-1"
                       data-testid="button-send-email"
                     >
                       {sending ? (
                         <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                           Sending...
                         </>
-                      ) : selectedEmail?.status === 'sent' ? (
+                      ) : selectedEmail.status === 'sent' ? (
                         <>
-                          <Check className="w-4 h-4" />
+                          <Check className="w-4 h-4 mr-2" />
                           Email Sent
                         </>
                       ) : (
                         <>
-                          <Send className="w-4 h-4" />
+                          <Send className="w-4 h-4 mr-2" />
                           Send Email
                         </>
                       )}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </>

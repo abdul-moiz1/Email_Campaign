@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { initializeFirebase } from "./firebase";
-import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema, sendEmailSchema } from "@shared/schema";
+import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema, sendEmailSchema, generateEmailSchema, updateEmailSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { getUncachableSendGridClient } from "./sendgrid";
 
@@ -211,6 +211,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(500).json({ 
           message: "Failed to send email",
+          error: error.message 
+        });
+      }
+    }
+  });
+
+  // Generate email via Make.com webhook
+  app.post("/api/emails/generate", async (req, res) => {
+    try {
+      const parsed = generateEmailSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        const error = fromZodError(parsed.error);
+        return res.status(400).json({ message: error.message });
+      }
+
+      const { emailId, businessName, businessEmail, phoneNumber, selectedProduct, address, website } = parsed.data;
+      
+      console.log(`Generating email for ${businessName} with product: ${selectedProduct}`);
+      
+      // Get Make.com webhook URL
+      const makeWebhookUrl = process.env.VITE_MAKE_WEBHOOK_URL;
+      const makeApiKey = process.env.MAKE_WEBHOOK_API_KEY;
+      
+      if (!makeWebhookUrl || !makeApiKey) {
+        console.error("Make.com webhook not configured");
+        return res.status(500).json({ 
+          message: "Webhook configuration error. Please contact support."
+        });
+      }
+      
+      // Send to Make.com webhook for AI email generation
+      const webhookResponse = await fetch(makeWebhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-make-apikey": makeApiKey,
+        },
+        body: JSON.stringify({
+          emailId,
+          businessName,
+          businessEmail: businessEmail || '',
+          phoneNumber: phoneNumber || '',
+          selectedProduct,
+          address,
+          website: website || '',
+          action: 'generate_email',
+        }),
+      });
+      
+      if (!webhookResponse.ok) {
+        const errorText = await webhookResponse.text();
+        console.error("Make.com webhook error:", webhookResponse.status, errorText);
+        return res.status(502).json({ 
+          message: "Failed to generate email. Please try again."
+        });
+      }
+      
+      // Parse the response from Make.com
+      const result = await webhookResponse.json();
+      
+      console.log("✓ Email generated via Make.com:", result);
+      
+      // Update email in Firestore with generated content
+      const subject = result.subject || `Introducing ${selectedProduct} for ${businessName}`;
+      const aiEmail = result.aiEmail || result.body || result.email || '';
+      
+      const updated = await storage.updateEmailWithGenerated(emailId, subject, aiEmail, selectedProduct);
+      
+      res.json({ 
+        message: "Email generated successfully",
+        email: updated
+      });
+    } catch (error: any) {
+      console.error("Generate email error:", error);
+      res.status(500).json({ 
+        message: "Failed to generate email",
+        error: error.message 
+      });
+    }
+  });
+
+  // Update email content (save edits)
+  app.patch("/api/emails/:id/update", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const parsed = updateEmailSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        const error = fromZodError(parsed.error);
+        return res.status(400).json({ message: error.message });
+      }
+
+      const { subject, body } = parsed.data;
+      
+      console.log(`Updating email ${id} with edited content`);
+      
+      const updated = await storage.updateEmailContent(id, subject, body);
+      
+      res.json({ 
+        message: "Email updated successfully",
+        email: updated
+      });
+    } catch (error: any) {
+      console.error("Update email error:", error);
+      if (error.message === 'Email not found') {
+        res.status(404).json({ message: error.message });
+      } else {
+        res.status(500).json({ 
+          message: "Failed to update email",
           error: error.message 
         });
       }

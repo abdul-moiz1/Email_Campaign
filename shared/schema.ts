@@ -74,16 +74,36 @@ export const enrichedDataSchema = z.object({
 
 export type EnrichedDataPayload = z.infer<typeof enrichedDataSchema>;
 
+// Product types for email generation
+export const productTypes = [
+  'AI Calling Agent',
+  'AI Chatbot',
+  'Booking Assistant',
+  'Custom AI Solution',
+] as const;
+
+export type ProductType = typeof productTypes[number];
+
+// Email status values
+export type EmailStatus = 'not_generated' | 'generated' | 'edited' | 'sent';
+
 // Generated Email schema (from Make.com AI)
 export interface GeneratedEmail {
   id: string;
   businessName: string;
   address: string;
   businessEmail: string;
+  phoneNumber?: string;
+  website?: string;
+  selectedProduct?: ProductType;
+  subject?: string;
   aiEmail: string;
+  editedSubject?: string;
+  editedBody?: string;
   mapLink?: string;
-  status: 'pending' | 'approved' | 'sent';
+  status: EmailStatus;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 // Send Email schema
@@ -95,3 +115,24 @@ export const sendEmailSchema = z.object({
 });
 
 export type SendEmail = z.infer<typeof sendEmailSchema>;
+
+// Generate Email schema (for Make.com webhook)
+export const generateEmailSchema = z.object({
+  emailId: z.string().min(1, "Email ID is required"),
+  businessName: z.string().min(1, "Business name is required"),
+  businessEmail: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  selectedProduct: z.enum(['AI Calling Agent', 'AI Chatbot', 'Booking Assistant', 'Custom AI Solution']),
+  address: z.string().min(1, "Address is required"),
+  website: z.string().optional(),
+});
+
+export type GenerateEmail = z.infer<typeof generateEmailSchema>;
+
+// Update Email schema (for saving edits)
+export const updateEmailSchema = z.object({
+  subject: z.string().min(1, "Subject is required"),
+  body: z.string().min(1, "Email body is required"),
+});
+
+export type UpdateEmail = z.infer<typeof updateEmailSchema>;
