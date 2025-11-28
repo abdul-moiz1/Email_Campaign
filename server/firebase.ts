@@ -5,6 +5,12 @@ let db: admin.firestore.Firestore | null = null;
 
 export function initializeFirebase() {
   try {
+    // Check if Firebase credentials are configured
+    if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
+      console.warn('⚠ Firebase credentials not configured - Firebase features will be disabled');
+      return null;
+    }
+
     // Check if Firebase Admin has already been initialized
     if (admin.apps.length === 0) {
       // Initialize with service account credentials from environment
@@ -25,11 +31,12 @@ export function initializeFirebase() {
     return db;
   } catch (error) {
     console.error('Firebase initialization error:', error);
-    throw error;
+    console.warn('⚠ Firebase features will be disabled');
+    return null;
   }
 }
 
-export function getFirestore(): admin.firestore.Firestore {
+export function getFirestore(): admin.firestore.Firestore | null {
   if (!db) {
     db = initializeFirebase();
   }
