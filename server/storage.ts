@@ -114,6 +114,15 @@ export class FirestoreStorage implements IStorage {
       // Use the document ID as campaignId if no explicit campaignId field exists
       // The generatedEmails collection uses Place IDs as document IDs which match campaign IDs
       const campaignId = data.campaignId || data.CampaignId || data['Campaign ID'] || data.campaign_id || doc.id;
+      const aiEmail = data.AIEmail || data.aiEmail || '';
+      
+      // Infer status based on content if status field is missing or incorrect
+      // If email content exists but status says 'not_generated', correct it to 'generated'
+      let status = data.status || 'not_generated';
+      if (aiEmail && aiEmail.trim() !== '' && status === 'not_generated') {
+        status = 'generated';
+      }
+      
       return {
         id: doc.id,
         campaignId,
@@ -124,11 +133,11 @@ export class FirestoreStorage implements IStorage {
         website: data.Website || data.website || undefined,
         selectedProduct: data.selectedProduct || undefined,
         subject: data.subject || undefined,
-        aiEmail: data.AIEmail || data.aiEmail || '',
+        aiEmail,
         editedSubject: data.editedSubject || undefined,
         editedBody: data.editedBody || undefined,
         mapLink: data.MapLink && data.MapLink.trim() !== '' ? data.MapLink : undefined,
-        status: data.status || 'not_generated',
+        status: status as EmailStatus,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || undefined,
       };
