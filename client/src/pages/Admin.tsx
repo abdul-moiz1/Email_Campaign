@@ -587,31 +587,29 @@ export default function Admin() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Dashboard</h1>
-              <p className="text-slate-500 mt-1">Manage campaigns and AI-generated emails</p>
+              <h1 className="text-2xl font-semibold text-slate-900">Admin Dashboard</h1>
+              <p className="text-slate-500 text-sm mt-0.5">Manage campaigns and AI-generated emails</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Button
                 onClick={() => {
                   fetchCampaigns();
                   fetchSubmissions();
                 }}
                 disabled={loading || loadingSubmissions}
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="icon"
                 data-testid="button-refresh"
               >
                 <RefreshCw className={`w-4 h-4 ${(loading || loadingSubmissions) ? 'animate-spin' : ''}`} />
-                <span className="ml-2 hidden sm:inline">Refresh</span>
               </Button>
-              <Button asChild variant="outline" size="sm">
+              <Button asChild variant="ghost" size="icon">
                 <Link href="/" data-testid="link-back-form">
                   <ArrowLeft className="w-4 h-4" />
-                  <span className="ml-2 hidden sm:inline">Back</span>
                 </Link>
               </Button>
             </div>
@@ -619,97 +617,85 @@ export default function Admin() {
         </motion.div>
 
         <Tabs defaultValue="campaigns" className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200">
-            <TabsList data-testid="tabs-admin">
-              <TabsTrigger value="campaigns" data-testid="tab-campaigns" className="gap-2">
-                <Building2 className="w-4 h-4" />
-                <span>Campaigns</span>
-                <Badge variant="secondary" className="ml-1">{campaigns.length}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="submissions" data-testid="tab-submissions" className="gap-2">
-                <Mail className="w-4 h-4" />
-                <span>Submissions</span>
-                <Badge variant="secondary" className="ml-1">{submissions.length}</Badge>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+          <TabsList data-testid="tabs-admin">
+            <TabsTrigger value="campaigns" data-testid="tab-campaigns" className="gap-2">
+              <Building2 className="w-4 h-4" />
+              <span>Campaigns</span>
+              <span className="text-xs text-muted-foreground ml-1">{campaigns.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="submissions" data-testid="tab-submissions" className="gap-2">
+              <Mail className="w-4 h-4" />
+              <span>Submissions</span>
+              <span className="text-xs text-muted-foreground ml-1">{submissions.length}</span>
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value="campaigns" className="space-y-4 mt-0">
-            <div className="bg-white rounded-lg border border-slate-200 p-4">
-              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Select value={filterMode} onValueChange={(value: FilterMode) => setFilterMode(value)}>
-                    <SelectTrigger className="w-[150px]" data-testid="select-filter-mode">
-                      <Filter className="w-4 h-4 mr-2 text-slate-500" />
-                      <SelectValue placeholder="Filter" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Campaigns</SelectItem>
-                      <SelectItem value="withEmail">With Email</SelectItem>
-                      <SelectItem value="withoutEmail">No Email</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input
-                      placeholder="Search by name, address, email..."
-                      value={searchKeyword}
-                      onChange={(e) => setSearchKeyword(e.target.value)}
-                      className="pl-9 w-[250px]"
-                      data-testid="input-search-keyword"
-                    />
-                  </div>
-                  <span className="text-sm text-slate-500">
-                    {filteredCampaigns.length} of {campaigns.length}
-                  </span>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    placeholder="Search campaigns..."
+                    value={searchKeyword}
+                    onChange={(e) => setSearchKeyword(e.target.value)}
+                    className="pl-9 w-[200px] sm:w-[260px] h-9"
+                    data-testid="input-search-keyword"
+                  />
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <Select value={filterMode} onValueChange={(value: FilterMode) => setFilterMode(value)}>
+                  <SelectTrigger className="w-[130px] h-9" data-testid="select-filter-mode">
+                    <SelectValue placeholder="Filter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="withEmail">With Email</SelectItem>
+                    <SelectItem value="withoutEmail">No Email</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-slate-400 hidden sm:inline">
+                  {filteredCampaigns.length} of {campaigns.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select 
+                  value={selectedCampaignIds.size === filteredCampaigns.length && filteredCampaigns.length > 0 ? "all" : selectedCampaignIds.size === 0 ? "none" : "some"}
+                  onValueChange={(value) => {
+                    if (value === "all") handleSelectAll();
+                    else if (value === "none") handleDeselectAll();
+                  }}
+                >
+                  <SelectTrigger className="w-[120px] h-9" data-testid="select-bulk-actions">
+                    <SelectValue>
+                      {selectedCampaignIds.size > 0 ? `${selectedCampaignIds.size} selected` : "Select"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" data-testid="button-select-all">Select All</SelectItem>
+                    <SelectItem value="none" data-testid="button-deselect-all">Clear Selection</SelectItem>
+                    <SelectItem value="some" disabled className="hidden">Partial</SelectItem>
+                  </SelectContent>
+                </Select>
+                {sendableSelectedCount > 0 && (
                   <Button
-                    onClick={handleSelectAll}
-                    variant="ghost"
+                    onClick={handleSendAllEmails}
+                    disabled={sendingAll}
                     size="sm"
-                    disabled={filteredCampaigns.length === 0}
-                    data-testid="button-select-all"
+                    data-testid="button-send-all"
                   >
-                    <CheckSquare className="w-4 h-4 mr-1" />
-                    All
+                    {sendingAll ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-1.5" />
+                        Send ({sendableSelectedCount})
+                      </>
+                    )}
                   </Button>
-                  <Button
-                    onClick={handleDeselectAll}
-                    variant="ghost"
-                    size="sm"
-                    disabled={selectedCampaignIds.size === 0}
-                    data-testid="button-deselect-all"
-                  >
-                    <Square className="w-4 h-4 mr-1" />
-                    None
-                  </Button>
-                  {selectedCampaignIds.size > 0 && (
-                    <Badge variant="outline" className="text-slate-600">
-                      {selectedCampaignIds.size} selected
-                    </Badge>
-                  )}
-                  {sendableSelectedCount > 0 && (
-                    <Button
-                      onClick={handleSendAllEmails}
-                      disabled={sendingAll}
-                      size="sm"
-                      data-testid="button-send-all"
-                    >
-                      {sendingAll ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 mr-1" />
-                          Send All ({sendableSelectedCount})
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           
