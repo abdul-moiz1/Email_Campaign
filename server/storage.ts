@@ -228,27 +228,17 @@ export class FirestoreStorage implements IStorage {
 
   async getAllCampaigns(): Promise<CampaignData[]> {
     try {
-      // Try to get with ordering first
-      let snapshot;
-      try {
-        snapshot = await this.db
-          .collection('CampaignData')
-          .orderBy('createdAt', 'desc')
-          .get();
-      } catch (orderError) {
-        // If ordering fails (field doesn't exist), get without ordering
-        console.log('CampaignData: createdAt field not found, fetching without order');
-        snapshot = await this.db
-          .collection('CampaignData')
-          .get();
-      }
+      // Fetch without ordering to avoid Firestore index requirements
+      const snapshot = await this.db
+        .collection('CampaignData')
+        .get();
 
       const campaigns = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
-          businessName: data.businessName || data.BusinessName || data.business_name || '',
-          businessEmail: data.businessEmail || data.BusinessEmail || data.business_email || data.email || undefined,
+          businessName: data.businessName || data.BusinessName || data.business_name || data.name || data.Name || '',
+          businessEmail: data.businessEmail || data.BusinessEmail || data.business_email || data.email || data.Email || undefined,
           address: data.address || data.Address || undefined,
           city: data.city || data.City || undefined,
           mapLink: data.mapLink || data.MapLink || data.map_link || undefined,
@@ -258,7 +248,7 @@ export class FirestoreStorage implements IStorage {
         };
       }) as CampaignData[];
 
-      // Sort in memory if we couldn't sort in the query
+      // Sort in memory by createdAt descending
       return campaigns.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     } catch (error) {
       console.error('Error fetching campaigns:', error);
