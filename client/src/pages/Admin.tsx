@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { authenticatedFetch } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog";
@@ -221,7 +222,7 @@ export default function Admin() {
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/campaigns");
+      const response = await authenticatedFetch("/api/campaigns");
       
       if (!response.ok) {
         throw new Error("Failed to fetch campaigns");
@@ -248,7 +249,7 @@ export default function Admin() {
   const fetchSubmissions = async () => {
     try {
       setLoadingSubmissions(true);
-      const response = await fetch("/api/submissions");
+      const response = await authenticatedFetch("/api/submissions");
       
       if (!response.ok) {
         throw new Error("Failed to fetch submissions");
@@ -269,8 +270,11 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    fetchCampaigns();
-    fetchSubmissions();
+    // Only fetch data when user is authenticated
+    if (user) {
+      fetchCampaigns();
+      fetchSubmissions();
+    }
     
     // Cleanup timeout on unmount
     return () => {
@@ -278,7 +282,7 @@ export default function Admin() {
         clearTimeout(loadTimeoutRef.current);
       }
     };
-  }, []);
+  }, [user]);
 
   // Initialize edited fields when selectedCampaign changes
   useEffect(() => {
@@ -325,7 +329,7 @@ export default function Admin() {
     setGenerating(campaign.id);
     
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/generate-email`, {
+      const response = await authenticatedFetch(`/api/campaigns/${campaign.id}/generate-email`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -373,7 +377,7 @@ export default function Admin() {
     setSaving(true);
     
     try {
-      const response = await fetch(`/api/emails/${selectedEmail.id}/update`, {
+      const response = await authenticatedFetch(`/api/emails/${selectedEmail.id}/update`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -427,7 +431,7 @@ export default function Admin() {
     setSending(true);
     
     try {
-      const response = await fetch("/api/emails/send", {
+      const response = await authenticatedFetch("/api/emails/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -502,7 +506,7 @@ export default function Admin() {
 
     for (const campaign of campaignsToSend) {
       try {
-        const response = await fetch("/api/emails/send", {
+        const response = await authenticatedFetch("/api/emails/send", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1068,7 +1072,7 @@ export default function Admin() {
                                 
                                 setSaving(true);
                                 try {
-                                  const response = await fetch(`/api/emails/${emailId}/update`, {
+                                  const response = await authenticatedFetch(`/api/emails/${emailId}/update`, {
                                     method: "PATCH",
                                     headers: {
                                       "Content-Type": "application/json",
@@ -1149,7 +1153,7 @@ export default function Admin() {
                                 
                                 setSending(true);
                                 try {
-                                  const response = await fetch("/api/emails/send", {
+                                  const response = await authenticatedFetch("/api/emails/send", {
                                     method: "POST",
                                     headers: {
                                       "Content-Type": "application/json",
