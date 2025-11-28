@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star, Plus, Filter, CheckSquare, Square, Search } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star, Plus, Filter, CheckSquare, Square, Search, LogOut } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from "@/components/ui/alert-dialog";
@@ -112,6 +113,8 @@ interface Submission {
 }
 
 export default function Admin() {
+  const { user, loading: authLoading, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const [campaigns, setCampaigns] = useState<CampaignWithEmail[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +138,26 @@ export default function Admin() {
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      setLocation("/login");
+    }
+  }, [authLoading, user, setLocation]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setLocation("/login");
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredCampaigns = useMemo(() => {
     let result = campaigns;
@@ -581,6 +604,20 @@ export default function Admin() {
     return email && email.aiEmail && email.aiEmail.trim() !== '';
   };
 
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -594,7 +631,19 @@ export default function Admin() {
               <h1 className="text-2xl font-semibold text-slate-900">Admin Dashboard</h1>
               <p className="text-slate-500 text-sm mt-0.5">Manage campaigns and AI-generated emails</p>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {user && (
+                <span className="text-sm text-slate-500 hidden sm:inline">{user.email}</span>
+              )}
+              <Button
+                onClick={handleLogout}
+                variant="ghost"
+                size="icon"
+                title="Logout"
+                data-testid="button-logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
               <Button
                 onClick={() => {
                   fetchCampaigns();

@@ -5,6 +5,7 @@ import { initializeFirebase } from "./firebase";
 import { businessSubmissionSchema, updateStatusSchema, enrichedDataSchema, sendEmailSchema, generateEmailSchema, updateEmailSchema, generateEmailFromCampaignSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { getUncachableSendGridClient } from "./sendgrid";
+import { requireAuth, type AuthenticatedRequest } from "./authMiddleware";
 
 function validateApiKey(req: Request, res: Response, next: NextFunction) {
   const apiKey = req.headers['x-make-apikey'];
@@ -92,8 +93,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all submissions
-  app.get("/api/submissions", async (req, res) => {
+  // Get all submissions (protected)
+  app.get("/api/submissions", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const submissions = await storage.getAllSubmissions();
       res.json(submissions);
@@ -103,8 +104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all generated emails
-  app.get("/api/emails/generated", async (req, res) => {
+  // Get all generated emails (protected)
+  app.get("/api/emails/generated", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const emails = await storage.getAllGeneratedEmails();
       res.json(emails);
@@ -114,8 +115,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update submission status
-  app.patch("/api/submissions/:id/status", async (req, res) => {
+  // Update submission status (protected)
+  app.patch("/api/submissions/:id/status", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const parsed = updateStatusSchema.safeParse(req.body);
@@ -167,8 +168,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send email via SendGrid
-  app.post("/api/emails/send", async (req, res) => {
+  // Send email via SendGrid (protected)
+  app.post("/api/emails/send", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const parsed = sendEmailSchema.safeParse(req.body);
       
@@ -217,8 +218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate email via Make.com webhook
-  app.post("/api/emails/generate", async (req, res) => {
+  // Generate email via Make.com webhook (protected)
+  app.post("/api/emails/generate", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const parsed = generateEmailSchema.safeParse(req.body);
       
@@ -294,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update email content (save edits)
-  app.patch("/api/emails/:id/update", async (req, res) => {
+  app.patch("/api/emails/:id/update", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const parsed = updateEmailSchema.safeParse(req.body);
@@ -328,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all campaigns with their email status
-  app.get("/api/campaigns", async (req, res) => {
+  app.get("/api/campaigns", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const campaigns = await storage.getAllCampaignsWithEmails();
       res.json(campaigns);
@@ -339,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get email for a specific campaign
-  app.get("/api/campaigns/:id/email", async (req, res) => {
+  app.get("/api/campaigns/:id/email", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const email = await storage.getEmailByCampaignId(id);
@@ -356,7 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate email for a campaign via Make.com webhook
-  app.post("/api/campaigns/:id/generate-email", async (req, res) => {
+  app.post("/api/campaigns/:id/generate-email", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const parsed = generateEmailFromCampaignSchema.safeParse({
