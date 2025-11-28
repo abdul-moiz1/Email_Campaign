@@ -25,14 +25,13 @@ export default function Success() {
           Thank you for providing your details. We'll review your information shortly.
         </p>
 
-        <Link href="/">
-          <a 
-            className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors w-full"
-            data-testid="link-back-home"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </a>
+        <Link 
+          href="/"
+          className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors w-full"
+          data-testid="link-back-home"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Home
         </Link>
       </motion.div>
     </div>

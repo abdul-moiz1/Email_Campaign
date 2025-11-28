@@ -40,8 +40,20 @@ function isValidEmail(email: string | undefined): boolean {
   // More robust email validation that excludes URLs and other non-email patterns
   // Must not contain slashes, must have @ not at start, domain must look like domain
   if (email.includes('/') || email.includes('http') || email.startsWith('@')) return false;
+  
+  // Handle multiple comma-separated emails - check if at least one is valid
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  return emailRegex.test(email);
+  const emails = email.split(',').map(e => e.trim());
+  return emails.some(e => emailRegex.test(e));
+}
+
+function getFirstValidEmail(email: string | undefined): string | undefined {
+  if (!email) return undefined;
+  if (email.includes('/') || email.includes('http') || email.startsWith('@')) return undefined;
+  
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const emails = email.split(',').map(e => e.trim());
+  return emails.find(e => emailRegex.test(e));
 }
 
 function extractCityCountry(address: string | undefined): string {
@@ -474,7 +486,7 @@ export default function Admin() {
           },
           body: JSON.stringify({
             emailId: campaign.email!.id,
-            recipientEmail: campaign.businessEmail,
+            recipientEmail: getFirstValidEmail(campaign.businessEmail),
             subject: campaign.email!.editedSubject || campaign.email!.subject || "Business Opportunity",
             body: campaign.email!.editedBody || campaign.email!.aiEmail,
           }),
