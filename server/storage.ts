@@ -163,7 +163,11 @@ export class FirestoreStorage implements IStorage {
     const existingData = doc.data()!;
     const now = new Date();
 
+    // Update both the original fields and edited fields for consistency
+    // This ensures the changes persist across reloads and are used when sending
     await docRef.update({
+      subject: subject,
+      AIEmail: body,
       editedSubject: subject,
       editedBody: body,
       status: 'edited',
@@ -179,8 +183,8 @@ export class FirestoreStorage implements IStorage {
       phoneNumber: existingData.PhoneNumber || existingData.phoneNumber || undefined,
       website: existingData.Website || existingData.website || undefined,
       selectedProduct: existingData.selectedProduct || undefined,
-      subject: existingData.subject || undefined,
-      aiEmail: existingData.AIEmail || existingData.aiEmail || '',
+      subject: subject,
+      aiEmail: body,
       editedSubject: subject,
       editedBody: body,
       mapLink: existingData.MapLink && existingData.MapLink.trim() !== '' ? existingData.MapLink : undefined,

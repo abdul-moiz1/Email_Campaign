@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star, Plus, Filter, CheckSquare, Square } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -37,7 +37,10 @@ function detectBusinessType(businessName: string): BusinessTypeFilter {
 
 function isValidEmail(email: string | undefined): boolean {
   if (!email) return false;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // More robust email validation that excludes URLs and other non-email patterns
+  // Must not contain slashes, must have @ not at start, domain must look like domain
+  if (email.includes('/') || email.includes('http') || email.startsWith('@')) return false;
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   return emailRegex.test(email);
 }
 
@@ -115,6 +118,8 @@ export default function Admin() {
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [businessTypeFilter, setBusinessTypeFilter] = useState<BusinessTypeFilter>('all');
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const filteredCampaigns = useMemo(() => {
@@ -176,6 +181,10 @@ export default function Admin() {
       
       const data = await response.json();
       setCampaigns(data);
+      // Mark as initially loaded after first successful fetch
+      if (!hasInitiallyLoaded && !loadTimeoutRef.current) {
+        loadTimeoutRef.current = setTimeout(() => setHasInitiallyLoaded(true), 500);
+      }
     } catch (error: any) {
       console.error("Fetch error:", error);
       toast({
@@ -214,6 +223,13 @@ export default function Admin() {
   useEffect(() => {
     fetchCampaigns();
     fetchSubmissions();
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Initialize edited fields when selectedCampaign changes
@@ -596,9 +612,9 @@ export default function Admin() {
               {filteredCampaigns.map((campaign, index) => (
                 <motion.div
                   key={campaign.id}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={hasInitiallyLoaded ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
+                  transition={hasInitiallyLoaded ? { duration: 0 } : { delay: index * 0.03 }}
                   className={`bg-white rounded-lg border transition-all duration-200 flex flex-col cursor-pointer hover:border-slate-300 ${selectedCampaignIds.has(campaign.id) ? 'border-blue-500 ring-1 ring-blue-100' : 'border-slate-200'}`}
                   onClick={() => setSelectedCampaign(campaign)}
                   data-testid={`card-campaign-${campaign.id}`}
@@ -961,23 +977,81 @@ export default function Admin() {
                             )}
                           </Button>
                           <Button
-                            onClick={() => {
+                            onClick={async () => {
                               if (selectedCampaign.email) {
-                                // Create updated email with current edited values
-                                const updatedEmail = {
-                                  ...selectedCampaign.email,
-                                  editedSubject: editedSubject,
-                                  editedBody: editedBody,
-                                };
-                                openEmailModal(updatedEmail);
-                                setSelectedCampaign(null);
+                                const email = selectedCampaign.email;
+                                const recipientEmail = email.businessEmail;
+                                
+                                if (!recipientEmail || !isValidEmail(recipientEmail)) {
+                                  toast({
+                                    title: "Cannot send email",
+                                    description: "No valid email address for this business.",
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
+                                
+                                setSending(true);
+                                try {
+                                  const response = await fetch("/api/emails/send", {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({
+                                      emailId: email.id,
+                                      recipientEmail: recipientEmail,
+                                      subject: editedSubject || email.subject || "Business Opportunity",
+                                      body: editedBody || email.aiEmail,
+                                    }),
+                                  });
+
+                                  if (!response.ok) {
+                                    const error = await response.json();
+                                    throw new Error(error.message || "Failed to send email");
+                                  }
+
+                                  // Update the campaigns list
+                                  setCampaigns(prev => prev.map(c => 
+                                    c.email?.id === email.id 
+                                      ? { ...c, email: { ...c.email!, status: 'sent' as EmailStatus } }
+                                      : c
+                                  ));
+                                  
+                                  // Close the dialog after successful send
+                                  setSelectedCampaign(null);
+                                  
+                                  toast({
+                                    title: "Email sent successfully",
+                                    description: `Email sent to ${recipientEmail}`,
+                                  });
+                                } catch (error: any) {
+                                  console.error("Send email error:", error);
+                                  toast({
+                                    title: "Failed to send email",
+                                    description: error.message || "Please try again.",
+                                    variant: "destructive",
+                                  });
+                                } finally {
+                                  setSending(false);
+                                }
                               }
                             }}
+                            disabled={sending}
                             className="flex-1"
                             data-testid="campaign-button-send-email"
                           >
-                            <Send className="w-4 h-4 mr-2" />
-                            Send Email
+                            {sending ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-4 h-4 mr-2" />
+                                Send Email
+                              </>
+                            )}
                           </Button>
                         </div>
                       </div>
