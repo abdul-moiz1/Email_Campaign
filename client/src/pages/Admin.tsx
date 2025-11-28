@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star, Plus, Filter, CheckSquare, Square } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Globe, Sparkles, Save, Star, Plus, Filter, CheckSquare, Square, Search } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -117,7 +117,9 @@ export default function Admin() {
   const [editedBody, setEditedBody] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [businessTypeFilter, setBusinessTypeFilter] = useState<BusinessTypeFilter>('all');
+  const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
+  const [sendingAll, setSendingAll] = useState(false);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -138,8 +140,19 @@ export default function Admin() {
       result = result.filter(c => detectBusinessType(c.businessName) === businessTypeFilter);
     }
     
+    // Keyword search filter
+    if (searchKeyword.trim()) {
+      const keyword = searchKeyword.toLowerCase().trim();
+      result = result.filter(c => 
+        c.businessName.toLowerCase().includes(keyword) ||
+        (c.address && c.address.toLowerCase().includes(keyword)) ||
+        (c.businessEmail && c.businessEmail.toLowerCase().includes(keyword)) ||
+        (c.city && c.city.toLowerCase().includes(keyword))
+      );
+    }
+    
     return result;
-  }, [campaigns, filterMode, businessTypeFilter]);
+  }, [campaigns, filterMode, businessTypeFilter, searchKeyword]);
 
   useEffect(() => {
     setSelectedCampaignIds(prev => {
@@ -428,6 +441,83 @@ export default function Admin() {
     setEditedBody(email.editedBody || email.aiEmail || "");
   };
 
+  const handleSendAllEmails = async () => {
+    // Get all selected campaigns that have valid email content and valid recipient email
+    const campaignsToSend = campaigns.filter(c => 
+      selectedCampaignIds.has(c.id) && 
+      c.hasEmail && 
+      c.email && 
+      c.email.aiEmail && 
+      c.email.aiEmail.trim() !== '' &&
+      isValidEmail(c.businessEmail)
+    );
+
+    if (campaignsToSend.length === 0) {
+      toast({
+        title: "No emails to send",
+        description: "Select campaigns that have generated emails and valid recipient addresses.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSendingAll(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const campaign of campaignsToSend) {
+      try {
+        const response = await fetch("/api/emails/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            emailId: campaign.email!.id,
+            recipientEmail: campaign.businessEmail,
+            subject: campaign.email!.editedSubject || campaign.email!.subject || "Business Opportunity",
+            body: campaign.email!.editedBody || campaign.email!.aiEmail,
+          }),
+        });
+
+        if (response.ok) {
+          successCount++;
+          // Update status in state
+          setCampaigns(prev => prev.map(c => 
+            c.id === campaign.id 
+              ? { ...c, email: { ...c.email!, status: 'sent' as EmailStatus } }
+              : c
+          ));
+        } else {
+          failCount++;
+        }
+      } catch {
+        failCount++;
+      }
+    }
+
+    setSendingAll(false);
+    setSelectedCampaignIds(new Set());
+
+    toast({
+      title: "Bulk send complete",
+      description: `${successCount} emails sent successfully${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+      variant: failCount > 0 ? "destructive" : "default",
+    });
+  };
+
+  // Count selected campaigns that can be sent (have email content and valid recipient)
+  const sendableSelectedCount = useMemo(() => {
+    return campaigns.filter(c => 
+      selectedCampaignIds.has(c.id) && 
+      c.hasEmail && 
+      c.email && 
+      c.email.aiEmail && 
+      c.email.aiEmail.trim() !== '' &&
+      isValidEmail(c.businessEmail)
+    ).length;
+  }, [campaigns, selectedCampaignIds]);
+
   const getEmailBadge = (campaign: CampaignWithEmail) => {
     const hasEmailContent = campaign.hasEmail && campaign.email && campaign.email.aiEmail && campaign.email.aiEmail.trim() !== '';
     if (hasEmailContent) {
@@ -547,26 +637,21 @@ export default function Admin() {
                       <SelectItem value="withoutEmail">No Email</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={businessTypeFilter} onValueChange={(value: BusinessTypeFilter) => setBusinessTypeFilter(value)}>
-                    <SelectTrigger className="w-[150px]" data-testid="select-business-type">
-                      <Building2 className="w-4 h-4 mr-2 text-slate-500" />
-                      <SelectValue placeholder="Business Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="restaurant">Restaurant</SelectItem>
-                      <SelectItem value="dental">Dental</SelectItem>
-                      <SelectItem value="retail">Retail</SelectItem>
-                      <SelectItem value="medical">Medical</SelectItem>
-                      <SelectItem value="automotive">Automotive</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      placeholder="Search by name, address, email..."
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      className="pl-9 w-[250px]"
+                      data-testid="input-search-keyword"
+                    />
+                  </div>
                   <span className="text-sm text-slate-500">
                     {filteredCampaigns.length} of {campaigns.length}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     onClick={handleSelectAll}
                     variant="ghost"
@@ -592,6 +677,26 @@ export default function Admin() {
                       {selectedCampaignIds.size} selected
                     </Badge>
                   )}
+                  {sendableSelectedCount > 0 && (
+                    <Button
+                      onClick={handleSendAllEmails}
+                      disabled={sendingAll}
+                      size="sm"
+                      data-testid="button-send-all"
+                    >
+                      {sendingAll ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 mr-1" />
+                          Send All ({sendableSelectedCount})
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -615,7 +720,7 @@ export default function Admin() {
                   initial={hasInitiallyLoaded ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={hasInitiallyLoaded ? { duration: 0 } : { delay: index * 0.03 }}
-                  className={`bg-white rounded-lg border transition-all duration-200 flex flex-col cursor-pointer hover:border-slate-300 ${selectedCampaignIds.has(campaign.id) ? 'border-blue-500 ring-1 ring-blue-100' : 'border-slate-200'}`}
+                  className={`bg-white rounded-lg border transition-all duration-200 flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 ${selectedCampaignIds.has(campaign.id) ? 'border-blue-500 ring-1 ring-blue-100' : 'border-slate-200 hover:border-slate-300'}`}
                   onClick={() => setSelectedCampaign(campaign)}
                   data-testid={`card-campaign-${campaign.id}`}
                 >
@@ -661,38 +766,42 @@ export default function Admin() {
                   </div>
 
                   <div className="p-4 pt-0 space-y-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
-                    <Select 
-                      value={selectedProducts[campaign.id] || campaign.email?.selectedProduct || ""} 
-                      onValueChange={(value) => {
-                        setSelectedProducts({...selectedProducts, [campaign.id]: value});
-                        setShowCustomInput({...showCustomInput, [campaign.id]: value === 'custom'});
-                      }}
-                    >
-                      <SelectTrigger className="w-full" data-testid={`select-product-${campaign.id}`}>
-                        <SelectValue placeholder="Select Product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {productTypes.map((product) => (
-                          <SelectItem key={product} value={product}>
-                            {product}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="custom">
-                          <span className="flex items-center gap-1">
-                            <Plus className="w-3 h-3" />
-                            Custom...
-                          </span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {!(campaign.hasEmail && hasEmailContent(campaign.email)) && (
+                      <>
+                        <Select 
+                          value={selectedProducts[campaign.id] || campaign.email?.selectedProduct || ""} 
+                          onValueChange={(value) => {
+                            setSelectedProducts({...selectedProducts, [campaign.id]: value});
+                            setShowCustomInput({...showCustomInput, [campaign.id]: value === 'custom'});
+                          }}
+                        >
+                          <SelectTrigger className="w-full" data-testid={`select-product-${campaign.id}`}>
+                            <SelectValue placeholder="Select Product" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {productTypes.map((product) => (
+                              <SelectItem key={product} value={product}>
+                                {product}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="custom">
+                              <span className="flex items-center gap-1">
+                                <Plus className="w-3 h-3" />
+                                Custom...
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
 
-                    {showCustomInput[campaign.id] && (
-                      <Input
-                        placeholder="Enter custom product..."
-                        value={customProducts[campaign.id] || ''}
-                        onChange={(e) => setCustomProducts({...customProducts, [campaign.id]: e.target.value})}
-                        data-testid={`input-custom-product-${campaign.id}`}
-                      />
+                        {showCustomInput[campaign.id] && (
+                          <Input
+                            placeholder="Enter custom product..."
+                            value={customProducts[campaign.id] || ''}
+                            onChange={(e) => setCustomProducts({...customProducts, [campaign.id]: e.target.value})}
+                            data-testid={`input-custom-product-${campaign.id}`}
+                          />
+                        )}
+                      </>
                     )}
 
                     {campaign.hasEmail && hasEmailContent(campaign.email) ? (
