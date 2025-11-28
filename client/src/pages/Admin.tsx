@@ -442,6 +442,7 @@ export default function Admin() {
           recipientEmail: selectedEmail.businessEmail,
           subject: editedSubject || selectedEmail.subject || "Business Opportunity",
           body: editedBody || selectedEmail.aiEmail,
+          businessName: selectedEmail.businessName,
         }),
       });
 
@@ -563,6 +564,7 @@ export default function Admin() {
             recipientEmail: getFirstValidEmail(campaign.businessEmail),
             subject: campaign.email!.editedSubject || campaign.email!.subject || "Business Opportunity",
             body: campaign.email!.editedBody || campaign.email!.aiEmail,
+            businessName: campaign.businessName,
           }),
         });
 
@@ -1235,6 +1237,7 @@ export default function Admin() {
                                       recipientEmail: recipientEmail,
                                       subject: editedSubject || email.subject || "Business Opportunity",
                                       body: editedBody || email.aiEmail,
+                                      businessName: selectedCampaign.businessName,
                                     }),
                                   });
 

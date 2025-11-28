@@ -202,20 +202,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
 
-      const { emailId, recipientEmail, subject, body } = parsed.data;
+      const { emailId, recipientEmail, subject, body, businessName } = parsed.data;
       
       console.log(`Sending email to ${recipientEmail} for email ID: ${emailId}`);
       
       // Get SendGrid client
       const { client, fromEmail } = await getUncachableSendGridClient();
       
-      // Send email
+      // Build final subject with business name if provided
+      const finalSubject = businessName ? `${subject} - ${businessName}` : subject;
+      
+      // Send email with custom_args for SendGrid tracking/analytics
       await client.send({
         to: recipientEmail,
         from: fromEmail,
-        subject: subject,
+        subject: finalSubject,
         text: body,
         html: body.replace(/\n/g, '<br>'),
+        customArgs: {
+          businessName: businessName || '',
+          emailId: emailId,
+        },
       });
       
       console.log(`✓ Email sent successfully to ${recipientEmail}`);

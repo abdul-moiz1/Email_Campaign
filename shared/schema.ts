@@ -140,6 +140,7 @@ export const sendEmailSchema = z.object({
   recipientEmail: z.string().email("Valid email address is required"),
   subject: z.string().min(1, "Subject is required"),
   body: z.string().min(1, "Email body is required"),
+  businessName: z.string().optional(),
 });
 
 export type SendEmail = z.infer<typeof sendEmailSchema>;
