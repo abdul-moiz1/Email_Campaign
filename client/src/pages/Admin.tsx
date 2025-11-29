@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
 
-type FilterMode = 'all' | 'withEmail' | 'withoutEmail';
+type FilterMode = 'all' | 'withEmail' | 'withoutEmail' | 'sent';
 type BusinessTypeFilter = 'all' | 'restaurant' | 'dental' | 'retail' | 'medical' | 'automotive' | 'other';
 
 const businessTypeKeywords: Record<Exclude<BusinessTypeFilter, 'all' | 'other'>, string[]> = {
@@ -170,6 +170,9 @@ export default function Admin() {
         break;
       case 'withoutEmail':
         result = result.filter(c => !c.hasEmail || !c.email || !c.email.aiEmail || c.email.aiEmail.trim() === '');
+        break;
+      case 'sent':
+        result = result.filter(c => c.hasEmail && c.email && c.email.status === 'sent');
         break;
     }
     
@@ -778,6 +781,7 @@ export default function Admin() {
                     <SelectItem value="all">All</SelectItem>
                     <SelectItem value="withEmail">With Email</SelectItem>
                     <SelectItem value="withoutEmail">No Email</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
                   </SelectContent>
                 </Select>
                 <span className="text-xs text-slate-400 hidden sm:inline">
