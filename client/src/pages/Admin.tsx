@@ -58,6 +58,15 @@ function getFirstValidEmail(email: string | undefined): string | undefined {
   return emails.find(e => emailRegex.test(e));
 }
 
+function getAllValidEmails(email: string | undefined): string[] {
+  if (!email) return [];
+  if (email.includes('/') || email.includes('http') || email.startsWith('@')) return [];
+  
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const emails = email.split(',').map(e => e.trim());
+  return emails.filter(e => emailRegex.test(e));
+}
+
 function extractCityCountry(address: string | undefined): string {
   if (!address) return '';
   const parts = address.split(',').map(p => p.trim());
@@ -138,6 +147,7 @@ export default function Admin() {
   const [sendingAll, setSendingAll] = useState(false);
   const [markingAsSent, setMarkingAsSent] = useState(false);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
@@ -288,7 +298,7 @@ export default function Admin() {
     };
   }, [user]);
 
-  // Initialize edited fields when selectedCampaign changes
+  // Initialize edited fields and selected recipients when selectedCampaign changes
   useEffect(() => {
     if (selectedCampaign?.hasEmail && selectedCampaign?.email) {
       setEditedSubject(selectedCampaign.email.editedSubject || selectedCampaign.email.subject || "");
@@ -296,6 +306,18 @@ export default function Admin() {
     } else if (selectedCampaign) {
       setEditedSubject("");
       setEditedBody("");
+    }
+    
+    // Initialize selected recipients with all valid emails
+    if (selectedCampaign?.businessEmail) {
+      const validEmails = getAllValidEmails(selectedCampaign.businessEmail);
+      if (validEmails.length > 0) {
+        setSelectedRecipients(new Set(validEmails));
+      } else {
+        setSelectedRecipients(new Set());
+      }
+    } else {
+      setSelectedRecipients(new Set());
     }
   }, [selectedCampaign]);
 
@@ -427,46 +449,69 @@ export default function Admin() {
   const handleSendEmail = async () => {
     if (!selectedEmail) return;
 
-    if (!selectedEmail.businessEmail || selectedEmail.businessEmail.trim() === '') {
+    const recipientsToSend = Array.from(selectedRecipients);
+    if (recipientsToSend.length === 0) {
       setShowNoEmailAlert(true);
       return;
     }
 
     setSending(true);
+    let successCount = 0;
+    let failCount = 0;
     
     try {
-      const response = await authenticatedFetch("/api/emails/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          emailId: selectedEmail.id,
-          recipientEmail: selectedEmail.businessEmail,
-          subject: editedSubject || selectedEmail.subject || "Business Opportunity",
-          body: editedBody || selectedEmail.aiEmail,
-          businessName: selectedEmail.businessName,
-        }),
-      });
+      for (const recipientEmail of recipientsToSend) {
+        try {
+          const response = await authenticatedFetch("/api/emails/send", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              emailId: selectedEmail.id,
+              recipientEmail: recipientEmail,
+              subject: editedSubject || selectedEmail.subject || "Business Opportunity",
+              body: editedBody || selectedEmail.aiEmail,
+              businessName: selectedEmail.businessName,
+            }),
+          });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to send email");
+          if (response.ok) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch {
+          failCount++;
+        }
       }
 
-      // Update the campaigns list
-      setCampaigns(campaigns.map(c => 
-        c.email?.id === selectedEmail.id 
-          ? { ...c, email: { ...c.email!, status: 'sent' as EmailStatus } }
-          : c
-      ));
-      
-      toast({
-        title: "Email sent successfully",
-        description: `Email sent to ${selectedEmail.businessEmail}`,
-      });
-      
-      setSelectedEmail(null);
+      // Only mark as sent if ALL recipients succeeded
+      if (failCount === 0 && successCount > 0) {
+        setCampaigns(campaigns.map(c => 
+          c.email?.id === selectedEmail.id 
+            ? { ...c, email: { ...c.email!, status: 'sent' as EmailStatus } }
+            : c
+        ));
+        toast({
+          title: "Email sent successfully",
+          description: `Email sent to ${successCount} recipient${successCount > 1 ? 's' : ''}`,
+        });
+        setSelectedEmail(null);
+        setSelectedCampaign(null);
+      } else if (successCount > 0 && failCount > 0) {
+        toast({
+          title: "Partial delivery",
+          description: `${successCount} sent, ${failCount} failed. Email not marked as sent - please retry failed recipients.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to send email",
+          description: "All delivery attempts failed. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error: any) {
       console.error("Send email error:", error);
       toast({
@@ -878,12 +923,22 @@ export default function Admin() {
                         </div>
                       )}
 
-                      {isValidEmail(campaign.businessEmail) && (
-                        <div className="flex items-center gap-2 text-slate-500">
-                          <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span className="truncate">{campaign.businessEmail}</span>
-                        </div>
-                      )}
+                      {isValidEmail(campaign.businessEmail) && (() => {
+                        const validEmails = getAllValidEmails(campaign.businessEmail);
+                        const firstEmail = validEmails[0];
+                        const additionalCount = validEmails.length - 1;
+                        return (
+                          <div className="flex items-center gap-2 text-slate-500">
+                            <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{firstEmail}</span>
+                            {additionalCount > 0 && (
+                              <Badge variant="secondary" className="text-xs px-1.5 py-0 flex-shrink-0" data-testid={`badge-more-emails-${campaign.id}`}>
+                                +{additionalCount}
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {campaign.phone && (
                         <div className="flex items-center gap-2 text-slate-500">
@@ -1055,14 +1110,69 @@ export default function Admin() {
                       </div>
                     )}
                     
-                    {selectedCampaign.businessEmail && (
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                        <a href={`mailto:${selectedCampaign.businessEmail}`} className="text-blue-600 hover:underline text-sm">
-                          {selectedCampaign.businessEmail}
-                        </a>
-                      </div>
-                    )}
+                    {selectedCampaign.businessEmail && (() => {
+                      const validEmails = getAllValidEmails(selectedCampaign.businessEmail);
+                      if (validEmails.length === 0) return null;
+                      
+                      return (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Mail className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                              <span className="text-sm font-medium text-slate-700">
+                                Recipients {validEmails.length > 1 && `(${validEmails.length} available)`}
+                              </span>
+                            </div>
+                            {validEmails.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (selectedRecipients.size === validEmails.length) {
+                                    setSelectedRecipients(new Set([validEmails[0]]));
+                                  } else {
+                                    setSelectedRecipients(new Set(validEmails));
+                                  }
+                                }}
+                                data-testid="button-toggle-all-recipients"
+                              >
+                                {selectedRecipients.size === validEmails.length ? 'Select Primary Only' : 'Select All'}
+                              </Button>
+                            )}
+                          </div>
+                          <div className="space-y-1.5 pl-6">
+                            {validEmails.map((email, idx) => (
+                              <div key={email} className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`recipient-${idx}`}
+                                  checked={selectedRecipients.has(email)}
+                                  onCheckedChange={(checked) => {
+                                    const newSet = new Set(selectedRecipients);
+                                    if (checked) {
+                                      newSet.add(email);
+                                    } else {
+                                      newSet.delete(email);
+                                      if (newSet.size === 0) {
+                                        newSet.add(validEmails[0]);
+                                      }
+                                    }
+                                    setSelectedRecipients(newSet);
+                                  }}
+                                  data-testid={`checkbox-recipient-${idx}`}
+                                />
+                                <label
+                                  htmlFor={`recipient-${idx}`}
+                                  className="text-sm text-blue-600 hover:underline cursor-pointer"
+                                >
+                                  {email}
+                                  {idx === 0 && <span className="text-slate-400 ml-1">(primary)</span>}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     
                     {selectedCampaign.phone && (
                       <div className="flex items-center gap-2">
@@ -1571,7 +1681,7 @@ export default function Admin() {
                       ) : (
                         <>
                           <Send className="w-4 h-4 mr-2" />
-                          Send Email
+                          Send Email{selectedRecipients.size > 1 ? ` (${selectedRecipients.size})` : ''}
                         </>
                       )}
                     </Button>
