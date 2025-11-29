@@ -1328,52 +1328,77 @@ export default function Admin() {
                             onClick={async () => {
                               if (selectedCampaign.email) {
                                 const email = selectedCampaign.email;
-                                const recipientEmail = email.businessEmail;
+                                const recipientsToSend = Array.from(selectedRecipients);
                                 
-                                if (!recipientEmail || !isValidEmail(recipientEmail)) {
+                                if (recipientsToSend.length === 0) {
                                   toast({
                                     title: "Cannot send email",
-                                    description: "No valid email address for this business.",
+                                    description: "No recipients selected.",
                                     variant: "destructive",
                                   });
                                   return;
                                 }
                                 
                                 setSending(true);
+                                let successCount = 0;
+                                let failCount = 0;
+                                
                                 try {
-                                  const response = await authenticatedFetch("/api/emails/send", {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({
-                                      emailId: email.id,
-                                      recipientEmail: recipientEmail,
-                                      subject: editedSubject || email.subject || "Business Opportunity",
-                                      body: editedBody || email.aiEmail,
-                                      businessName: selectedCampaign.businessName,
-                                    }),
-                                  });
+                                  for (const recipientEmail of recipientsToSend) {
+                                    try {
+                                      const response = await authenticatedFetch("/api/emails/send", {
+                                        method: "POST",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                        },
+                                        body: JSON.stringify({
+                                          emailId: email.id,
+                                          recipientEmail: recipientEmail,
+                                          subject: editedSubject || email.subject || "Business Opportunity",
+                                          body: editedBody || email.aiEmail,
+                                          businessName: selectedCampaign.businessName,
+                                        }),
+                                      });
 
-                                  if (!response.ok) {
-                                    const error = await response.json();
-                                    throw new Error(error.message || "Failed to send email");
+                                      if (response.ok) {
+                                        successCount++;
+                                      } else {
+                                        failCount++;
+                                      }
+                                    } catch {
+                                      failCount++;
+                                    }
                                   }
 
-                                  // Update the campaigns list
-                                  setCampaigns(prev => prev.map(c => 
-                                    c.email?.id === email.id 
-                                      ? { ...c, email: { ...c.email!, status: 'sent' as EmailStatus } }
-                                      : c
-                                  ));
-                                  
-                                  // Close the dialog after successful send
-                                  setSelectedCampaign(null);
-                                  
-                                  toast({
-                                    title: "Email sent successfully",
-                                    description: `Email sent to ${recipientEmail}`,
-                                  });
+                                  // Only mark as sent if ALL recipients succeeded
+                                  if (failCount === 0 && successCount > 0) {
+                                    // Update the campaigns list
+                                    setCampaigns(prev => prev.map(c => 
+                                      c.email?.id === email.id 
+                                        ? { ...c, email: { ...c.email!, status: 'sent' as EmailStatus } }
+                                        : c
+                                    ));
+                                    
+                                    // Close the dialog after successful send
+                                    setSelectedCampaign(null);
+                                    
+                                    toast({
+                                      title: "Email sent successfully",
+                                      description: `Email sent to ${successCount} recipient${successCount > 1 ? 's' : ''}`,
+                                    });
+                                  } else if (successCount > 0 && failCount > 0) {
+                                    toast({
+                                      title: "Partial delivery",
+                                      description: `${successCount} sent, ${failCount} failed. Please retry failed recipients.`,
+                                      variant: "destructive",
+                                    });
+                                  } else {
+                                    toast({
+                                      title: "Failed to send email",
+                                      description: "All delivery attempts failed. Please try again.",
+                                      variant: "destructive",
+                                    });
+                                  }
                                 } catch (error: any) {
                                   console.error("Send email error:", error);
                                   toast({
@@ -1386,7 +1411,7 @@ export default function Admin() {
                                 }
                               }
                             }}
-                            disabled={sending}
+                            disabled={sending || selectedRecipients.size === 0}
                             className="flex-1"
                             data-testid="campaign-button-send-email"
                           >
@@ -1398,7 +1423,7 @@ export default function Admin() {
                             ) : (
                               <>
                                 <Send className="w-4 h-4 mr-2" />
-                                Send Email
+                                Send Email{selectedRecipients.size > 1 ? ` (${selectedRecipients.size})` : ''}
                               </>
                             )}
                           </Button>
