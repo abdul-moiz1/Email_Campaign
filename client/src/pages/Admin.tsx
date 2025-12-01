@@ -375,6 +375,21 @@ export default function Admin() {
     }
   }, [selectedCampaign]);
 
+  // Sync selectedCampaign with campaigns array when campaigns updates
+  useEffect(() => {
+    if (selectedCampaign && campaigns.length > 0) {
+      const updatedCampaign = campaigns.find(c => c.id === selectedCampaign.id);
+      if (updatedCampaign && updatedCampaign !== selectedCampaign) {
+        // Only update if the email content has changed
+        const currentEmailContent = selectedCampaign.email?.aiEmail || '';
+        const newEmailContent = updatedCampaign.email?.aiEmail || '';
+        if (currentEmailContent !== newEmailContent) {
+          setSelectedCampaign(updatedCampaign);
+        }
+      }
+    }
+  }, [campaigns]);
+
   const getSelectedProduct = (campaignId: string): string => {
     const selected = selectedProducts[campaignId];
     if (selected === 'custom') {
@@ -431,22 +446,73 @@ export default function Admin() {
       }
       
       toast({
-        title: "Email generation started",
-        description: "The email is being generated. Please refresh in a moment to see the result.",
+        title: "Generating email...",
+        description: "Please wait while the AI generates your email.",
       });
 
-      setTimeout(() => {
-        fetchCampaigns();
-      }, 3000);
+      // Poll for the generated email every 3 seconds, up to 60 seconds
+      const maxAttempts = 20;
+      const pollInterval = 3000;
+      let attempts = 0;
+      
+      const pollForEmail = async (): Promise<boolean> => {
+        attempts++;
+        try {
+          const campaignsResponse = await authenticatedFetch('/api/campaigns');
+          if (campaignsResponse.ok) {
+            const updatedCampaigns = await campaignsResponse.json();
+            const updatedCampaign = updatedCampaigns.find((c: CampaignWithEmail) => c.id === campaign.id);
+            
+            // Check if email has been generated (has content)
+            if (updatedCampaign?.email?.aiEmail && updatedCampaign.email.aiEmail.trim() !== '') {
+              setCampaigns(updatedCampaigns);
+              // Update selectedCampaign to show the new email in the dialog
+              setSelectedCampaign(updatedCampaign);
+              // Also update the edited fields
+              setEditedSubject(updatedCampaign.email.editedSubject || updatedCampaign.email.subject || '');
+              setEditedBody(updatedCampaign.email.editedBody || updatedCampaign.email.aiEmail || '');
+              return true;
+            }
+          }
+        } catch (err) {
+          console.error("Poll error:", err);
+        }
+        return false;
+      };
+
+      // Start polling
+      const poll = async () => {
+        const found = await pollForEmail();
+        if (found) {
+          setGenerating(null);
+          toast({
+            title: "Email generated!",
+            description: "Your AI-generated email is ready.",
+          });
+        } else if (attempts < maxAttempts) {
+          setTimeout(poll, pollInterval);
+        } else {
+          setGenerating(null);
+          toast({
+            title: "Generation taking longer than expected",
+            description: "The email may still be generating. Try refreshing in a moment.",
+            variant: "destructive",
+          });
+          fetchCampaigns();
+        }
+      };
+
+      // Wait 3 seconds before first poll
+      setTimeout(poll, pollInterval);
+      
     } catch (error: any) {
       console.error("Generate error:", error);
+      setGenerating(null);
       toast({
         title: "Generation failed",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setGenerating(null);
     }
   };
 
