@@ -418,6 +418,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update campaign business email
+  app.patch("/api/campaigns/:id/email", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { email } = req.body;
+      
+      if (!email || typeof email !== 'string' || email.trim() === '') {
+        return res.status(400).json({ message: "Valid email address is required" });
+      }
+      
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+      
+      console.log(`Updating campaign ${id} with email: ${email}`);
+      
+      await storage.updateCampaignEmail(id, email.trim());
+      
+      res.json({ 
+        message: "Campaign email updated successfully",
+        email: email.trim()
+      });
+    } catch (error: any) {
+      console.error("Update campaign email error:", error);
+      if (error.message === 'Campaign not found') {
+        res.status(404).json({ message: error.message });
+      } else {
+        res.status(500).json({ 
+          message: "Failed to update campaign email",
+          error: error.message 
+        });
+      }
+    }
+  });
+
   // Generate email for a campaign via Make.com webhook
   app.post("/api/campaigns/:id/generate-email", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {

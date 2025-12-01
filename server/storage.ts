@@ -14,6 +14,7 @@ export interface IStorage {
   getAllCampaigns(): Promise<CampaignData[]>;
   getAllCampaignsWithEmails(): Promise<CampaignWithEmail[]>;
   getEmailByCampaignId(campaignId: string): Promise<GeneratedEmail | null>;
+  updateCampaignEmail(campaignId: string, email: string): Promise<void>;
 }
 
 export class FirestoreStorage implements IStorage {
@@ -399,6 +400,20 @@ export class FirestoreStorage implements IStorage {
       email: emailsByCampaignId.get(campaign.id),
       hasEmail: emailsByCampaignId.has(campaign.id),
     }));
+  }
+
+  async updateCampaignEmail(campaignId: string, email: string): Promise<void> {
+    const docRef = this.db.collection('CampaignData').doc(campaignId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      throw new Error('Campaign not found');
+    }
+
+    await docRef.update({
+      businessEmail: email,
+      BusinessEmail: email,
+    });
   }
 }
 

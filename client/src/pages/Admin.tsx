@@ -20,7 +20,34 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, LineChart, Line, XAxis, YAxis } from "recharts";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
 
-type FilterMode = 'all' | 'withEmail' | 'withoutEmail' | 'sent';
+type FilterMode = 'all' | 'withEmail' | 'withoutEmail' | 'invalidEmail' | 'sent';
+
+type EmailIssue = 'missing' | 'invalid_format' | 'contains_url' | 'starts_with_at' | null;
+
+function getEmailIssue(email: string | undefined): EmailIssue {
+  if (!email || email.trim() === '') return 'missing';
+  
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const emails = email.split(',').map(e => e.trim());
+  const hasValidEmail = emails.some(e => emailRegex.test(e));
+  
+  if (hasValidEmail) return null;
+  
+  if (email.includes('/') || email.includes('http')) return 'contains_url';
+  if (email.startsWith('@')) return 'starts_with_at';
+  
+  return 'invalid_format';
+}
+
+function getEmailIssueLabel(issue: EmailIssue): string {
+  switch (issue) {
+    case 'missing': return 'No Email';
+    case 'invalid_format': return 'Invalid Format';
+    case 'contains_url': return 'Contains URL';
+    case 'starts_with_at': return 'Starts with @';
+    default: return '';
+  }
+}
 
 // Dynamic color palette for business types
 const dynamicColorPalette = [
@@ -157,6 +184,8 @@ export default function Admin() {
   const [markingAsSent, setMarkingAsSent] = useState(false);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
+  const [manualEmail, setManualEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
@@ -197,6 +226,9 @@ export default function Admin() {
         break;
       case 'withoutEmail':
         result = result.filter(c => !c.hasEmail || !c.email || !c.email.aiEmail || c.email.aiEmail.trim() === '');
+        break;
+      case 'invalidEmail':
+        result = result.filter(c => getEmailIssue(c.businessEmail) !== null);
         break;
       case 'sent':
         result = result.filter(c => c.hasEmail && c.email && c.email.status === 'sent');
@@ -1149,13 +1181,14 @@ export default function Admin() {
                   </div>
                   <div className="flex items-center gap-3 flex-wrap">
                     <Select value={filterMode} onValueChange={(value: FilterMode) => setFilterMode(value)}>
-                      <SelectTrigger className="w-[130px]" data-testid="select-filter-mode">
+                      <SelectTrigger className="w-[150px]" data-testid="select-filter-mode">
                         <SelectValue placeholder="Filter" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="withEmail">With Email</SelectItem>
                         <SelectItem value="withoutEmail">No Email</SelectItem>
+                        <SelectItem value="invalidEmail">Invalid/Missing</SelectItem>
                         <SelectItem value="sent">Sent</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1263,7 +1296,20 @@ export default function Admin() {
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-slate-400 text-sm">-</span>
+                                <div className="flex items-center gap-1.5">
+                                  <Badge 
+                                    variant="outline" 
+                                    className="text-xs bg-amber-50 text-amber-700 border-amber-200"
+                                    data-testid={`badge-email-issue-${campaign.id}`}
+                                  >
+                                    {getEmailIssueLabel(getEmailIssue(campaign.businessEmail))}
+                                  </Badge>
+                                  {campaign.businessEmail && campaign.businessEmail.trim() !== '' && (
+                                    <span className="text-slate-400 text-xs truncate max-w-[100px]" title={campaign.businessEmail}>
+                                      {campaign.businessEmail}
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </TableCell>
                             <TableCell className="hidden sm:table-cell py-4">
@@ -1386,8 +1432,111 @@ export default function Admin() {
                       </div>
                     )}
                     
-                    {selectedCampaign.businessEmail && (() => {
+                    {(() => {
                       const validEmails = getAllValidEmails(selectedCampaign.businessEmail);
+                      const emailIssue = getEmailIssue(selectedCampaign.businessEmail);
+                      
+                      if (emailIssue !== null) {
+                        return (
+                          <div className="space-y-3 border border-amber-200 bg-amber-50 rounded-lg p-3">
+                            <div className="flex items-center gap-2">
+                              <Mail className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                              <span className="text-sm font-medium text-amber-800">Email Issue</span>
+                              <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
+                                {getEmailIssueLabel(emailIssue)}
+                              </Badge>
+                            </div>
+                            {selectedCampaign.businessEmail && selectedCampaign.businessEmail.trim() !== '' && (
+                              <div className="text-xs text-amber-700 pl-6 break-all">
+                                Current value: {selectedCampaign.businessEmail}
+                              </div>
+                            )}
+                            <div className="pl-6 space-y-2">
+                              <label className="text-sm font-medium text-slate-700">Enter valid email address:</label>
+                              <div className="flex gap-2">
+                                <Input
+                                  type="email"
+                                  value={manualEmail}
+                                  onChange={(e) => setManualEmail(e.target.value)}
+                                  placeholder="example@company.com"
+                                  className="flex-1 bg-white"
+                                  data-testid="input-manual-email"
+                                />
+                                <Button
+                                  onClick={async () => {
+                                    if (!manualEmail.trim()) {
+                                      toast({
+                                        title: "Email required",
+                                        description: "Please enter an email address.",
+                                        variant: "destructive",
+                                      });
+                                      return;
+                                    }
+                                    
+                                    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                                    if (!emailRegex.test(manualEmail.trim())) {
+                                      toast({
+                                        title: "Invalid email",
+                                        description: "Please enter a valid email address.",
+                                        variant: "destructive",
+                                      });
+                                      return;
+                                    }
+                                    
+                                    setSavingEmail(true);
+                                    try {
+                                      const response = await authenticatedFetch(`/api/campaigns/${selectedCampaign.id}/email`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ email: manualEmail.trim() }),
+                                      });
+                                      
+                                      if (!response.ok) {
+                                        throw new Error('Failed to update email');
+                                      }
+                                      
+                                      setCampaigns(prev => prev.map(c => 
+                                        c.id === selectedCampaign.id 
+                                          ? { ...c, businessEmail: manualEmail.trim() } 
+                                          : c
+                                      ));
+                                      
+                                      setSelectedCampaign(prev => 
+                                        prev ? { ...prev, businessEmail: manualEmail.trim() } : null
+                                      );
+                                      
+                                      setManualEmail('');
+                                      
+                                      toast({
+                                        title: "Email updated",
+                                        description: "Business email has been saved successfully.",
+                                      });
+                                    } catch (error) {
+                                      toast({
+                                        title: "Failed to save",
+                                        description: "Could not update the email. Please try again.",
+                                        variant: "destructive",
+                                      });
+                                    } finally {
+                                      setSavingEmail(false);
+                                    }
+                                  }}
+                                  disabled={savingEmail}
+                                  size="sm"
+                                  data-testid="button-save-manual-email"
+                                >
+                                  {savingEmail ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Save className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      
                       if (validEmails.length === 0) return null;
                       
                       return (
