@@ -393,18 +393,41 @@ export default function Admin() {
   // Compute submission trends data
   const submissionTrendsData = useMemo(() => {
     const grouped: { [key: string]: number } = {};
+    
     campaigns.forEach((campaign) => {
-      const date = new Date(campaign.createdAt || Date.now());
-      const key = `${date.getMonth() + 1}/${date.getDate()}`;
-      grouped[key] = (grouped[key] || 0) + 1;
+      try {
+        // Handle both Date objects and Firestore Timestamp objects
+        let dateObj: Date;
+        const createdAt = campaign.createdAt as any;
+        
+        if (createdAt instanceof Date) {
+          dateObj = createdAt;
+        } else if (typeof createdAt === 'object' && createdAt !== null && typeof createdAt.toDate === 'function') {
+          // Firestore Timestamp
+          dateObj = createdAt.toDate();
+        } else if (typeof createdAt === 'string') {
+          dateObj = new Date(createdAt);
+        } else {
+          dateObj = new Date();
+        }
+        
+        const key = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+        grouped[key] = (grouped[key] || 0) + 1;
+      } catch (err) {
+        console.error('Error parsing date:', campaign.createdAt, err);
+      }
     });
-    return Object.entries(grouped)
+    
+    const result = Object.entries(grouped)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => {
         const [aM, aD] = a.date.split('/').map(Number);
         const [bM, bD] = b.date.split('/').map(Number);
         return aM - bM || aD - bD;
       });
+    
+    console.log('Submission trends data:', result);
+    return result;
   }, [campaigns]);
 
   const getSelectedProduct = (campaignId: string): string => {
