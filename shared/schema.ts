@@ -15,6 +15,7 @@ export interface CampaignData {
   id: string;
   businessName: string;
   businessEmail?: string;
+  businessType?: string;
   address?: string;
   city?: string;
   mapLink?: string;

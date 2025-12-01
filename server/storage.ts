@@ -304,6 +304,7 @@ export class FirestoreStorage implements IStorage {
           id: doc.id,
           businessName: data.businessName || data.BusinessName || data.business_name || data.name || data.Name || '',
           businessEmail: data.businessEmail || data.BusinessEmail || data.business_email || data.email || data.Email || undefined,
+          businessType: data.businessType || data.BusinessType || data.business_type || data['Business Type'] || data.type || data.Type || undefined,
           address: data.address || data.Address || undefined,
           city: data.city || data.City || undefined,
           mapLink: data.mapLink || data.MapLink || data.map_link || data['Map Link'] || undefined,

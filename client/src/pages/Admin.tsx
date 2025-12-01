@@ -21,44 +21,31 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
 
 type FilterMode = 'all' | 'withEmail' | 'withoutEmail' | 'sent';
-type BusinessTypeFilter = 'all' | 'restaurant' | 'dental' | 'retail' | 'medical' | 'automotive' | 'other';
 
-const businessTypeKeywords: Record<Exclude<BusinessTypeFilter, 'all' | 'other'>, string[]> = {
-  restaurant: ['restaurant', 'cafe', 'coffee', 'pizza', 'food', 'dining', 'bistro', 'grill', 'kitchen', 'bakery', 'bar', 'pub', 'sushi', 'thai', 'chinese', 'indian', 'mexican', 'italian', 'deli', 'superstore', 'grocery', 'shawarma', 'fast food'],
-  dental: ['dental', 'dentist', 'orthodont', 'teeth', 'oral', 'smile'],
-  retail: ['store', 'shop', 'boutique', 'mart', 'outlet', 'retail', 'mall'],
-  medical: ['medical', 'clinic', 'hospital', 'health', 'doctor', 'physician', 'pharmacy', 'physio', 'chiro'],
-  automotive: ['auto', 'car', 'vehicle', 'tire', 'mechanic', 'repair', 'motor', 'garage'],
-};
+// Dynamic color palette for business types
+const dynamicColorPalette = [
+  '#3b82f6', // blue
+  '#f97316', // orange
+  '#22c55e', // green
+  '#8b5cf6', // purple
+  '#06b6d4', // cyan
+  '#ef4444', // red
+  '#eab308', // yellow
+  '#ec4899', // pink
+  '#14b8a6', // teal
+  '#f59e0b', // amber
+];
 
-const businessTypeColors: Record<BusinessTypeFilter, string> = {
-  all: '#64748b',
-  restaurant: '#f97316',
-  dental: '#06b6d4',
-  retail: '#8b5cf6',
-  medical: '#22c55e',
-  automotive: '#ef4444',
-  other: '#94a3b8',
-};
+// Get a consistent color for a business type
+function getBusinessTypeColor(businessType: string, allTypes: string[]): string {
+  const index = allTypes.indexOf(businessType);
+  if (index === -1) return '#94a3b8'; // fallback gray
+  return dynamicColorPalette[index % dynamicColorPalette.length];
+}
 
-const businessTypeLabels: Record<BusinessTypeFilter, string> = {
-  all: 'All',
-  restaurant: 'Restaurant',
-  dental: 'Dental Clinic',
-  retail: 'Retail',
-  medical: 'Medical',
-  automotive: 'Automotive',
-  other: 'Other',
-};
-
-function detectBusinessType(businessName: string): BusinessTypeFilter {
-  const lowerName = businessName.toLowerCase();
-  for (const [type, keywords] of Object.entries(businessTypeKeywords)) {
-    if (keywords.some(keyword => lowerName.includes(keyword))) {
-      return type as BusinessTypeFilter;
-    }
-  }
-  return 'other';
+// Get the business type from campaign (use actual stored value or 'Other')
+function getBusinessType(campaign: { businessType?: string }): string {
+  return campaign.businessType?.trim() || 'Other';
 }
 
 function isValidEmail(email: string | undefined): boolean {
@@ -122,6 +109,7 @@ interface CampaignWithEmail {
   id: string;
   businessName: string;
   businessEmail?: string;
+  businessType?: string;
   address?: string;
   city?: string;
   mapLink?: string;
@@ -162,7 +150,7 @@ export default function Admin() {
   const [editedSubject, setEditedSubject] = useState("");
   const [editedBody, setEditedBody] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
-  const [businessTypeFilter, setBusinessTypeFilter] = useState<BusinessTypeFilter>('all');
+  const [businessTypeFilter, setBusinessTypeFilter] = useState<string>('all');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
   const [sendingAll, setSendingAll] = useState(false);
@@ -191,6 +179,15 @@ export default function Admin() {
     }
   };
 
+  // Get unique business types from campaigns
+  const uniqueBusinessTypes = useMemo(() => {
+    const types = new Set<string>();
+    campaigns.forEach(c => {
+      types.add(getBusinessType(c));
+    });
+    return Array.from(types).sort();
+  }, [campaigns]);
+
   const filteredCampaigns = useMemo(() => {
     let result = campaigns;
     
@@ -207,7 +204,7 @@ export default function Admin() {
     }
     
     if (businessTypeFilter !== 'all') {
-      result = result.filter(c => detectBusinessType(c.businessName) === businessTypeFilter);
+      result = result.filter(c => getBusinessType(c) === businessTypeFilter);
     }
     
     if (searchKeyword.trim()) {
@@ -223,35 +220,30 @@ export default function Admin() {
     return result;
   }, [campaigns, filterMode, businessTypeFilter, searchKeyword]);
 
+  // Dynamic business type stats based on actual data
   const businessTypeStats = useMemo(() => {
-    const counts: Record<BusinessTypeFilter, number> = {
-      all: campaigns.length,
-      restaurant: 0,
-      dental: 0,
-      retail: 0,
-      medical: 0,
-      automotive: 0,
-      other: 0,
-    };
+    const counts: Record<string, number> = { all: campaigns.length };
     
     campaigns.forEach(c => {
-      const type = detectBusinessType(c.businessName);
-      counts[type]++;
+      const type = getBusinessType(c);
+      counts[type] = (counts[type] || 0) + 1;
     });
     
     return counts;
   }, [campaigns]);
 
+  // Dynamic pie chart data based on actual business types
   const pieChartData = useMemo(() => {
     return Object.entries(businessTypeStats)
       .filter(([key]) => key !== 'all')
-      .map(([key, value]) => ({
-        name: businessTypeLabels[key as BusinessTypeFilter],
+      .map(([type, value]) => ({
+        name: type,
         value,
-        color: businessTypeColors[key as BusinessTypeFilter],
+        color: getBusinessTypeColor(type, uniqueBusinessTypes),
       }))
-      .filter(item => item.value > 0);
-  }, [businessTypeStats]);
+      .filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [businessTypeStats, uniqueBusinessTypes]);
 
   const chartConfig: ChartConfig = useMemo(() => {
     const config: ChartConfig = {};
@@ -749,10 +741,9 @@ export default function Admin() {
     );
   };
 
-  const getBusinessTypeBadge = (businessName: string) => {
-    const type = detectBusinessType(businessName);
-    const color = businessTypeColors[type];
-    const label = businessTypeLabels[type];
+  const getBusinessTypeBadge = (campaign: CampaignWithEmail) => {
+    const type = getBusinessType(campaign);
+    const color = getBusinessTypeColor(type, uniqueBusinessTypes);
     
     return (
       <Badge 
@@ -763,9 +754,9 @@ export default function Admin() {
           borderColor: `${color}40`,
           color: color,
         }}
-        data-testid={`badge-type-${type}`}
+        data-testid={`badge-type-${type.toLowerCase().replace(/\s+/g, '-')}`}
       >
-        {label}
+        {type}
       </Badge>
     );
   };
@@ -991,24 +982,25 @@ export default function Admin() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {Object.entries(businessTypeStats)
                   .filter(([key]) => key !== 'all')
-                  .map(([key, value]) => (
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([type, value]) => (
                     <button
-                      key={key}
-                      onClick={() => setBusinessTypeFilter(key as BusinessTypeFilter)}
+                      key={type}
+                      onClick={() => setBusinessTypeFilter(type)}
                       className={`p-3 rounded-lg border transition-all text-left ${
-                        businessTypeFilter === key 
+                        businessTypeFilter === type 
                           ? 'border-blue-500 bg-blue-50' 
                           : 'border-slate-200 bg-slate-50 hover:border-slate-300'
                       }`}
-                      data-testid={`filter-type-${key}`}
+                      data-testid={`filter-type-${type.toLowerCase().replace(/\s+/g, '-')}`}
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <div 
                           className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: businessTypeColors[key as BusinessTypeFilter] }} 
+                          style={{ backgroundColor: getBusinessTypeColor(type, uniqueBusinessTypes) }} 
                         />
                         <span className="text-xs font-medium text-slate-600">
-                          {businessTypeLabels[key as BusinessTypeFilter]}
+                          {type}
                         </span>
                       </div>
                       <div className="text-xl font-bold text-slate-900">{value}</div>
@@ -1144,41 +1136,41 @@ export default function Admin() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredCampaigns.map((campaign, index) => (
+                        {filteredCampaigns.map((campaign) => (
                           <TableRow 
                             key={campaign.id}
-                            className={`cursor-pointer transition-colors ${selectedCampaignIds.has(campaign.id) ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-slate-50'}`}
+                            className={`cursor-pointer transition-colors border-b border-slate-100 ${selectedCampaignIds.has(campaign.id) ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50/50'}`}
                             onClick={() => setSelectedCampaign(campaign)}
                             data-testid={`row-campaign-${campaign.id}`}
                           >
-                            <TableCell className="w-[40px]" onClick={(e) => e.stopPropagation()}>
+                            <TableCell className="w-[40px] py-4" onClick={(e) => e.stopPropagation()}>
                               <Checkbox 
                                 checked={selectedCampaignIds.has(campaign.id)}
                                 onCheckedChange={() => toggleCampaignSelection(campaign.id)}
                                 data-testid={`checkbox-campaign-${campaign.id}`}
                               />
                             </TableCell>
-                            <TableCell>
-                              <div className="font-medium text-slate-900">{campaign.businessName}</div>
+                            <TableCell className="py-4">
+                              <div className="font-medium text-slate-900 max-w-[200px] truncate">{campaign.businessName}</div>
                               <div className="text-xs text-slate-500 sm:hidden mt-0.5">
                                 {extractCityCountry(campaign.address)}
                               </div>
                             </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              <div className="flex items-center gap-1.5 text-slate-600 text-sm">
-                                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                                <span className="truncate max-w-[180px]">{extractCityCountry(campaign.address) || '-'}</span>
+                            <TableCell className="hidden md:table-cell py-4">
+                              <div className="flex items-center gap-1.5 text-slate-500 text-sm">
+                                <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                <span className="truncate max-w-[150px]">{extractCityCountry(campaign.address) || '-'}</span>
                               </div>
                             </TableCell>
-                            <TableCell className="hidden lg:table-cell">
+                            <TableCell className="hidden lg:table-cell py-4">
                               {isValidEmail(campaign.businessEmail) ? (
                                 <div className="flex items-center gap-1.5 text-sm">
-                                  <Mail className="w-3.5 h-3.5 text-slate-400" />
-                                  <span className="text-slate-600 truncate max-w-[180px]">
+                                  <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                  <span className="text-slate-500 truncate max-w-[160px]">
                                     {getFirstValidEmail(campaign.businessEmail)}
                                   </span>
                                   {getAllValidEmails(campaign.businessEmail).length > 1 && (
-                                    <Badge variant="secondary" className="text-xs px-1.5 py-0" data-testid={`badge-more-emails-${campaign.id}`}>
+                                    <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-blue-100 text-blue-700 border-0" data-testid={`badge-more-emails-${campaign.id}`}>
                                       +{getAllValidEmails(campaign.businessEmail).length - 1}
                                     </Badge>
                                   )}
@@ -1187,22 +1179,23 @@ export default function Admin() {
                                 <span className="text-slate-400 text-sm">-</span>
                               )}
                             </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              {getBusinessTypeBadge(campaign.businessName)}
+                            <TableCell className="hidden sm:table-cell py-4">
+                              {getBusinessTypeBadge(campaign)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="py-4">
                               {getEmailBadge(campaign)}
                             </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                            <TableCell className="text-right py-4">
+                              <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                                 {campaign.hasEmail && hasEmailContent(campaign.email) ? (
                                   <Button
                                     onClick={(e) => { e.stopPropagation(); campaign.email && openEmailModal(campaign.email); }}
                                     size="sm"
                                     variant="ghost"
+                                    className="text-slate-600 hover:text-slate-900"
                                     data-testid={`button-view-email-${campaign.id}`}
                                   >
-                                    <Mail className="w-4 h-4 mr-1" />
+                                    <Mail className="w-4 h-4 mr-1.5" />
                                     <span className="hidden sm:inline">View</span>
                                   </Button>
                                 ) : (
@@ -1210,16 +1203,18 @@ export default function Admin() {
                                     onClick={(e) => { e.stopPropagation(); setSelectedCampaign(campaign); }}
                                     size="sm"
                                     variant="ghost"
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                     data-testid={`button-generate-${campaign.id}`}
                                   >
-                                    <Sparkles className="w-4 h-4 mr-1" />
+                                    <Sparkles className="w-4 h-4 mr-1.5" />
                                     <span className="hidden sm:inline">Generate</span>
                                   </Button>
                                 )}
                                 <Button
                                   onClick={(e) => { e.stopPropagation(); setSelectedCampaign(campaign); }}
-                                  size="sm"
+                                  size="icon"
                                   variant="ghost"
+                                  className="text-slate-400 hover:text-slate-600"
                                   data-testid={`button-details-${campaign.id}`}
                                 >
                                   <Eye className="w-4 h-4" />
@@ -1329,7 +1324,7 @@ export default function Admin() {
                 <div className="space-y-5 mt-3">
                   <div className="bg-slate-50 rounded-lg p-4 space-y-3">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {getBusinessTypeBadge(selectedCampaign.businessName)}
+                      {getBusinessTypeBadge(selectedCampaign)}
                       {getEmailBadge(selectedCampaign)}
                     </div>
                     
