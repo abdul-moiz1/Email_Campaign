@@ -1055,24 +1055,9 @@ export default function Admin() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Select 
-                      value={selectedCampaignIds.size === filteredCampaigns.length && filteredCampaigns.length > 0 ? "all" : selectedCampaignIds.size === 0 ? "none" : "some"}
-                      onValueChange={(value) => {
-                        if (value === "all") handleSelectAll();
-                        else if (value === "none") handleDeselectAll();
-                      }}
-                    >
-                      <SelectTrigger className="w-[130px]" data-testid="select-bulk-actions">
-                        <SelectValue>
-                          {selectedCampaignIds.size > 0 ? `${selectedCampaignIds.size} selected` : "Select"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all" data-testid="button-select-all">Select All</SelectItem>
-                        <SelectItem value="none" data-testid="button-deselect-all">Clear Selection</SelectItem>
-                        <SelectItem value="some" disabled className="hidden">Partial</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {selectedCampaignIds.size > 0 && (
+                      <span className="text-sm text-slate-500">{selectedCampaignIds.size} selected</span>
+                    )}
                     {sendableSelectedCount > 0 && (
                       <Button
                         onClick={handleSendAllEmails}
@@ -1113,7 +1098,16 @@ export default function Admin() {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-slate-50 hover:bg-slate-50">
-                          <TableHead className="w-[40px]"></TableHead>
+                          <TableHead className="w-[40px]">
+                            <Checkbox 
+                              checked={selectedCampaignIds.size === filteredCampaigns.length && filteredCampaigns.length > 0}
+                              onCheckedChange={(checked) => {
+                                if (checked) handleSelectAll();
+                                else handleDeselectAll();
+                              }}
+                              data-testid="checkbox-select-all"
+                            />
+                          </TableHead>
                           <TableHead className="font-semibold text-slate-700">Business Name</TableHead>
                           <TableHead className="font-semibold text-slate-700 hidden md:table-cell">Location</TableHead>
                           <TableHead className="font-semibold text-slate-700 hidden lg:table-cell">Email</TableHead>
