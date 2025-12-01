@@ -213,7 +213,8 @@ export default function Admin() {
         c.businessName.toLowerCase().includes(keyword) ||
         (c.address && c.address.toLowerCase().includes(keyword)) ||
         (c.businessEmail && c.businessEmail.toLowerCase().includes(keyword)) ||
-        (c.city && c.city.toLowerCase().includes(keyword))
+        (c.city && c.city.toLowerCase().includes(keyword)) ||
+        (c.businessType && c.businessType.toLowerCase().includes(keyword))
       );
     }
     
@@ -700,36 +701,22 @@ export default function Admin() {
   }, [campaigns, selectedCampaignIds]);
 
   const getEmailBadge = (campaign: CampaignWithEmail) => {
-    const validStatuses: EmailStatus[] = ['not_generated', 'generated', 'edited', 'sent'];
+    const hasEmailContent = campaign.email && campaign.email.aiEmail && campaign.email.aiEmail.trim() !== '';
     
-    if (campaign.email && campaign.email.status && validStatuses.includes(campaign.email.status)) {
-      const status = campaign.email.status;
-      
-      const styles: Record<EmailStatus, string> = {
-        not_generated: "bg-slate-100 text-slate-600 border-slate-200",
-        generated: "bg-blue-100 text-blue-700 border-blue-200",
-        edited: "bg-amber-100 text-amber-700 border-amber-200",
-        sent: "bg-emerald-100 text-emerald-700 border-emerald-200",
-      };
-
-      const labels: Record<EmailStatus, string> = {
-        not_generated: "Pending",
-        generated: "Ready",
-        edited: "Edited",
-        sent: "Sent",
-      };
-
-      const icons: Record<EmailStatus, React.ReactNode> = {
-        not_generated: <Clock className="w-3 h-3 mr-1" />,
-        generated: <Sparkles className="w-3 h-3 mr-1" />,
-        edited: <Save className="w-3 h-3 mr-1" />,
-        sent: <Check className="w-3 h-3 mr-1" />,
-      };
-
+    if (hasEmailContent && campaign.email?.status === 'sent') {
       return (
-        <Badge variant="default" className={`${styles[status]} flex-shrink-0`} data-testid={`badge-${status}`}>
-          {icons[status]}
-          {labels[status]}
+        <Badge variant="default" className="bg-emerald-100 text-emerald-700 border-emerald-200 flex-shrink-0" data-testid="badge-email-sent">
+          <Check className="w-3 h-3 mr-1" />
+          Email Sent
+        </Badge>
+      );
+    }
+    
+    if (hasEmailContent) {
+      return (
+        <Badge variant="default" className="bg-blue-100 text-blue-700 border-blue-200 flex-shrink-0" data-testid="badge-email-generated">
+          <Mail className="w-3 h-3 mr-1" />
+          Email Generated
         </Badge>
       );
     }
