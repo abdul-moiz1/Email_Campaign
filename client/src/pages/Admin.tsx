@@ -49,18 +49,18 @@ function getEmailIssueLabel(issue: EmailIssue): string {
   }
 }
 
-// Dynamic color palette for business types
+// Dynamic color palette for business types (avoiding status-like colors: green, red, amber/yellow)
 const dynamicColorPalette = [
   '#3b82f6', // blue
-  '#f97316', // orange
-  '#22c55e', // green
   '#8b5cf6', // purple
   '#06b6d4', // cyan
-  '#ef4444', // red
-  '#eab308', // yellow
   '#ec4899', // pink
   '#14b8a6', // teal
-  '#f59e0b', // amber
+  '#6366f1', // indigo
+  '#0ea5e9', // sky
+  '#a855f7', // violet
+  '#f472b6', // rose
+  '#2dd4bf', // emerald-teal
 ];
 
 // Get a consistent color for a business type
@@ -179,6 +179,7 @@ export default function Admin() {
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [businessTypeFilter, setBusinessTypeFilter] = useState<string>('all');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [emailIssuesTypeSearch, setEmailIssuesTypeSearch] = useState('');
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
   const [sendingAll, setSendingAll] = useState(false);
   const [markingAsSent, setMarkingAsSent] = useState(false);
@@ -260,8 +261,17 @@ export default function Admin() {
   }, [campaigns]);
 
   const emailIssuesCampaigns = useMemo(() => {
-    return campaigns.filter(c => getEmailIssue(c.businessEmail) !== null);
-  }, [campaigns]);
+    let result = campaigns.filter(c => getEmailIssue(c.businessEmail) !== null);
+    
+    if (emailIssuesTypeSearch.trim()) {
+      const keyword = emailIssuesTypeSearch.toLowerCase().trim();
+      result = result.filter(c => 
+        getBusinessType(c).toLowerCase().includes(keyword)
+      );
+    }
+    
+    return result;
+  }, [campaigns, emailIssuesTypeSearch]);
 
   const validEmailCampaigns = useMemo(() => {
     let result = campaigns.filter(c => getEmailIssue(c.businessEmail) === null);
@@ -419,11 +429,18 @@ export default function Admin() {
     }
   }, [campaigns]);
 
-  // Compute email trends data (emails generated per day)
-  const emailTrendsData = useMemo(() => {
-    const grouped: { [key: string]: number } = {};
+  // Compute email trends data by business type (only count campaigns with generated emails)
+  const { emailTrendsByType, topEmailTypes } = useMemo(() => {
+    const grouped: { [date: string]: { [type: string]: number } } = {};
+    
+    // Count business types by volume to get top types
+    const typeVolume: { [type: string]: number } = {};
     
     campaigns.forEach((campaign) => {
+      // Only count campaigns that have generated emails
+      const hasEmail = campaign.hasEmail && campaign.email && campaign.email.aiEmail && campaign.email.aiEmail.trim() !== '';
+      if (!hasEmail) return;
+      
       try {
         let dateObj: Date;
         const createdAt = campaign.createdAt as any;
@@ -438,23 +455,40 @@ export default function Admin() {
           dateObj = new Date();
         }
         
-        const key = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
-        const hasEmail = campaign.hasEmail && campaign.email && campaign.email.aiEmail && campaign.email.aiEmail.trim() !== '';
-        if (hasEmail) {
-          grouped[key] = (grouped[key] || 0) + 1;
+        const dateKey = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+        const businessType = getBusinessType(campaign);
+        
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = {};
         }
+        grouped[dateKey][businessType] = (grouped[dateKey][businessType] || 0) + 1;
+        typeVolume[businessType] = (typeVolume[businessType] || 0) + 1;
       } catch (err) {
         console.error('Error parsing date:', campaign.createdAt, err);
       }
     });
     
-    return Object.entries(grouped)
-      .map(([date, count]) => ({ date, count }))
+    // Get top 5 business types by volume
+    const topTypes = Object.entries(typeVolume)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([type]) => type);
+    
+    const data = Object.entries(grouped)
+      .map(([date, typeCounts]) => {
+        const entry: { date: string; [key: string]: string | number } = { date };
+        topTypes.forEach(type => {
+          entry[type] = typeCounts[type] || 0;
+        });
+        return entry;
+      })
       .sort((a, b) => {
         const [aM, aD] = a.date.split('/').map(Number);
         const [bM, bD] = b.date.split('/').map(Number);
         return aM - bM || aD - bD;
       });
+    
+    return { emailTrendsByType: data, topEmailTypes: topTypes };
   }, [campaigns]);
 
   const getSelectedProduct = (campaignId: string): string => {
@@ -863,11 +897,17 @@ export default function Admin() {
 
   const getBusinessTypeBadge = (campaign: CampaignWithEmail) => {
     const type = getBusinessType(campaign);
+    const color = getBusinessTypeColor(type, uniqueBusinessTypes);
     
     return (
       <Badge 
-        variant="secondary" 
-        className="flex-shrink-0 text-xs bg-slate-100 text-slate-600 border-slate-200"
+        variant="outline" 
+        className="flex-shrink-0 text-xs"
+        style={{ 
+          backgroundColor: `${color}15`,
+          borderColor: `${color}40`,
+          color: color
+        }}
         data-testid={`badge-type-${type.toLowerCase().replace(/\s+/g, '-')}`}
       >
         {type}
@@ -1025,7 +1065,7 @@ export default function Admin() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6"
         >
           <Card className="lg:col-span-1 bg-white border-slate-200">
             <CardHeader className="pb-2">
@@ -1036,15 +1076,15 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               {pieChartData.length > 0 ? (
-                <div className="h-[220px]">
+                <div className="h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={pieChartData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
+                        innerRadius={40}
+                        outerRadius={65}
                         paddingAngle={2}
                         dataKey="value"
                       >
@@ -1070,7 +1110,7 @@ export default function Admin() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
+                <div className="h-[180px] flex items-center justify-center text-slate-400 text-sm">
                   No data to display
                 </div>
               )}
@@ -1085,56 +1125,73 @@ export default function Admin() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-1 bg-white border-slate-200">
+          <Card className="lg:col-span-2 bg-white border-slate-200">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium text-slate-900 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-slate-500" />
-                Email Trends (by date)
+                Business Trends by Type
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {campaigns.length > 0 ? (
-                <div className="h-[220px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={emailTrendsData}
-                      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                    >
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="#cbd5e1"
-                        style={{ fontSize: '12px' }}
-                      />
-                      <YAxis 
-                        stroke="#cbd5e1"
-                        style={{ fontSize: '12px' }}
-                      />
-                      <ChartTooltip 
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
-                                <p className="text-sm font-medium text-slate-900">{payload[0].payload.date}</p>
-                                <p className="text-sm text-blue-600">{payload[0].value} emails generated</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke="#3b82f6" 
-                        dot={{ fill: '#3b82f6', r: 4 }}
-                        activeDot={{ r: 6 }}
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+              {campaigns.length > 0 && topEmailTypes.length > 0 ? (
+                <>
+                  <div className="h-[180px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={emailTrendsByType}
+                        margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                      >
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#cbd5e1"
+                          style={{ fontSize: '11px' }}
+                        />
+                        <YAxis 
+                          stroke="#cbd5e1"
+                          style={{ fontSize: '11px' }}
+                        />
+                        <ChartTooltip 
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
+                                  <p className="text-sm font-medium text-slate-900 mb-1">{label}</p>
+                                  {payload.map((entry: any, index: number) => (
+                                    <p key={index} className="text-xs" style={{ color: entry.color }}>
+                                      {entry.dataKey}: {entry.value}
+                                    </p>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        {topEmailTypes.map((type) => (
+                          <Line 
+                            key={type}
+                            type="monotone" 
+                            dataKey={type}
+                            stroke={getBusinessTypeColor(type, uniqueBusinessTypes)}
+                            dot={{ fill: getBusinessTypeColor(type, uniqueBusinessTypes), r: 3 }}
+                            activeDot={{ r: 5 }}
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-3 justify-center">
+                    {topEmailTypes.map((type) => (
+                      <div key={type} className="flex items-center gap-1.5 text-xs text-slate-600">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getBusinessTypeColor(type, uniqueBusinessTypes) }} />
+                        <span>{type}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
-                <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
+                <div className="h-[180px] flex items-center justify-center text-slate-400 text-sm">
                   No data to display
                 </div>
               )}
@@ -1328,13 +1385,25 @@ export default function Admin() {
           <TabsContent value="email-issues" className="space-y-4 mt-0">
             <Card className="bg-white border-slate-200">
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-amber-100 rounded-lg">
-                    <X className="w-4 h-4 text-amber-600" />
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <X className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-medium text-slate-900">Businesses with Email Issues</CardTitle>
+                      <p className="text-sm text-slate-500 mt-0.5">These businesses have missing or invalid email addresses</p>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="text-base font-medium text-slate-900">Businesses with Email Issues</CardTitle>
-                    <p className="text-sm text-slate-500 mt-0.5">These businesses have missing or invalid email addresses</p>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      placeholder="Search by type..."
+                      value={emailIssuesTypeSearch}
+                      onChange={(e) => setEmailIssuesTypeSearch(e.target.value)}
+                      className="pl-9 w-[180px]"
+                      data-testid="input-email-issues-type-search"
+                    />
                   </div>
                 </div>
               </CardHeader>
