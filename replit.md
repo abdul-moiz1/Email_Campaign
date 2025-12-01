@@ -225,6 +225,15 @@ generatedEmails/
 
 ## Recent Features & Improvements
 
+### Invalid/Missing Email Filter & Manual Correction (Dec 1, 2025)
+- Added "Invalid/Missing Email" filter option to identify businesses with email problems
+- Email validation categorizes issues: missing, invalid format, contains URL, starts with @
+- Filter only shows businesses where NO valid email exists (handles comma-separated mixed emails correctly)
+- Added visual issue badges in the campaign list showing specific email problems
+- Manual email entry section in campaign dialog allows admins to correct email addresses
+- New PATCH endpoint `/api/campaigns/:id/email` persists email corrections to Firestore
+- Updates both `businessEmail` and `BusinessEmail` fields for compatibility
+
 ### Email Generation Auto-Polling (Dec 1, 2025)
 - Implemented automatic polling (3-second intervals, 60-second timeout) when generating emails via Make.com webhook
 - Dialog automatically updates when email is generated without requiring manual refresh
