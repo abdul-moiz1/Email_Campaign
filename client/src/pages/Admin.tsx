@@ -1174,7 +1174,7 @@ export default function Admin() {
                             </TableCell>
                             <TableCell className="text-right py-4">
                               <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                                {campaign.hasEmail && hasEmailContent(campaign.email) ? (
+                                {campaign.hasEmail && hasEmailContent(campaign.email) && (
                                   <Button
                                     onClick={(e) => { e.stopPropagation(); campaign.email && openEmailModal(campaign.email); }}
                                     size="sm"
@@ -1184,17 +1184,6 @@ export default function Admin() {
                                   >
                                     <Mail className="w-4 h-4 mr-1.5" />
                                     <span className="hidden sm:inline">View</span>
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    onClick={(e) => { e.stopPropagation(); setSelectedCampaign(campaign); }}
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                    data-testid={`button-generate-${campaign.id}`}
-                                  >
-                                    <Sparkles className="w-4 h-4 mr-1.5" />
-                                    <span className="hidden sm:inline">Generate</span>
                                   </Button>
                                 )}
                                 <Button
