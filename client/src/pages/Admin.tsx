@@ -20,7 +20,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, LineChart, Line, XAxis, YAxis } from "recharts";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
 
-type FilterMode = 'all' | 'withEmail' | 'withoutEmail' | 'invalidEmail' | 'sent';
+type FilterMode = 'all' | 'withEmail' | 'withoutEmail' | 'sent';
 
 type EmailIssue = 'missing' | 'invalid_format' | 'contains_url' | 'starts_with_at' | null;
 
@@ -217,42 +217,6 @@ export default function Admin() {
     return Array.from(types).sort();
   }, [campaigns]);
 
-  const filteredCampaigns = useMemo(() => {
-    let result = campaigns;
-    
-    switch (filterMode) {
-      case 'withEmail':
-        result = result.filter(c => c.hasEmail && c.email && c.email.aiEmail && c.email.aiEmail.trim() !== '');
-        break;
-      case 'withoutEmail':
-        result = result.filter(c => !c.hasEmail || !c.email || !c.email.aiEmail || c.email.aiEmail.trim() === '');
-        break;
-      case 'invalidEmail':
-        result = result.filter(c => getEmailIssue(c.businessEmail) !== null);
-        break;
-      case 'sent':
-        result = result.filter(c => c.hasEmail && c.email && c.email.status === 'sent');
-        break;
-    }
-    
-    if (businessTypeFilter !== 'all') {
-      result = result.filter(c => getBusinessType(c) === businessTypeFilter);
-    }
-    
-    if (searchKeyword.trim()) {
-      const keyword = searchKeyword.toLowerCase().trim();
-      result = result.filter(c => 
-        c.businessName.toLowerCase().includes(keyword) ||
-        (c.address && c.address.toLowerCase().includes(keyword)) ||
-        (c.businessEmail && c.businessEmail.toLowerCase().includes(keyword)) ||
-        (c.city && c.city.toLowerCase().includes(keyword)) ||
-        (c.businessType && c.businessType.toLowerCase().includes(keyword))
-      );
-    }
-    
-    return result;
-  }, [campaigns, filterMode, businessTypeFilter, searchKeyword]);
-
   // Dynamic business type stats based on actual data
   const businessTypeStats = useMemo(() => {
     const counts: Record<string, number> = { all: campaigns.length };
@@ -295,6 +259,39 @@ export default function Admin() {
     return { withEmail, sent, total: campaigns.length };
   }, [campaigns]);
 
+  const emailIssuesCampaigns = useMemo(() => {
+    return campaigns.filter(c => getEmailIssue(c.businessEmail) !== null);
+  }, [campaigns]);
+
+  const validEmailCampaigns = useMemo(() => {
+    let result = campaigns.filter(c => getEmailIssue(c.businessEmail) === null);
+    
+    if (filterMode === 'withEmail') {
+      result = result.filter(c => c.hasEmail && c.email && c.email.aiEmail && c.email.aiEmail.trim() !== '');
+    } else if (filterMode === 'withoutEmail') {
+      result = result.filter(c => !c.hasEmail || !c.email || !c.email.aiEmail || c.email.aiEmail.trim() === '');
+    } else if (filterMode === 'sent') {
+      result = result.filter(c => c.hasEmail && c.email && c.email.status === 'sent');
+    }
+    
+    if (businessTypeFilter !== 'all') {
+      result = result.filter(c => getBusinessType(c) === businessTypeFilter);
+    }
+    
+    if (searchKeyword.trim()) {
+      const keyword = searchKeyword.toLowerCase().trim();
+      result = result.filter(c => 
+        c.businessName.toLowerCase().includes(keyword) ||
+        (c.address && c.address.toLowerCase().includes(keyword)) ||
+        (c.businessEmail && c.businessEmail.toLowerCase().includes(keyword)) ||
+        (c.city && c.city.toLowerCase().includes(keyword)) ||
+        (c.businessType && c.businessType.toLowerCase().includes(keyword))
+      );
+    }
+    
+    return result;
+  }, [campaigns, filterMode, businessTypeFilter, searchKeyword]);
+
   useEffect(() => {
     setSelectedCampaignIds(prev => {
       const currentCampaignIds = new Set(campaigns.map(c => c.id));
@@ -304,7 +301,7 @@ export default function Admin() {
   }, [campaigns]);
 
   const handleSelectAll = () => {
-    const allIds = new Set(filteredCampaigns.map(c => c.id));
+    const allIds = new Set(validEmailCampaigns.map(c => c.id));
     setSelectedCampaignIds(allIds);
   };
 
@@ -866,17 +863,11 @@ export default function Admin() {
 
   const getBusinessTypeBadge = (campaign: CampaignWithEmail) => {
     const type = getBusinessType(campaign);
-    const color = getBusinessTypeColor(type, uniqueBusinessTypes);
     
     return (
       <Badge 
-        variant="outline" 
-        className="flex-shrink-0 text-xs"
-        style={{ 
-          backgroundColor: `${color}15`,
-          borderColor: `${color}40`,
-          color: color,
-        }}
+        variant="secondary" 
+        className="flex-shrink-0 text-xs bg-slate-100 text-slate-600 border-slate-200"
         data-testid={`badge-type-${type.toLowerCase().replace(/\s+/g, '-')}`}
       >
         {type}
@@ -1156,12 +1147,14 @@ export default function Admin() {
             <TabsTrigger value="campaigns" data-testid="tab-campaigns" className="gap-2">
               <Building2 className="w-4 h-4" />
               <span>Businesses</span>
-              <span className="text-xs text-muted-foreground ml-1">{campaigns.length}</span>
+              <span className="text-xs text-muted-foreground ml-1">{campaigns.filter(c => getEmailIssue(c.businessEmail) === null).length}</span>
             </TabsTrigger>
-            <TabsTrigger value="submissions" data-testid="tab-submissions" className="gap-2">
-              <Mail className="w-4 h-4" />
-              <span>Submissions</span>
-              <span className="text-xs text-muted-foreground ml-1">{submissions.length}</span>
+            <TabsTrigger value="email-issues" data-testid="tab-email-issues" className="gap-2">
+              <X className="w-4 h-4" />
+              <span>Email Issues</span>
+              {emailIssuesCampaigns.length > 0 && (
+                <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full ml-1">{emailIssuesCampaigns.length}</span>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -1188,12 +1181,11 @@ export default function Admin() {
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="withEmail">With Email</SelectItem>
                         <SelectItem value="withoutEmail">No Email</SelectItem>
-                        <SelectItem value="invalidEmail">Invalid/Missing</SelectItem>
                         <SelectItem value="sent">Sent</SelectItem>
                       </SelectContent>
                     </Select>
                     <span className="text-sm text-slate-500">
-                      {filteredCampaigns.length} of {campaigns.length}
+                      {validEmailCampaigns.length} of {campaigns.filter(c => getEmailIssue(c.businessEmail) === null).length}
                     </span>
                     {selectedCampaignIds.size > 0 && (
                       <span className="text-sm text-blue-600 font-medium">{selectedCampaignIds.size} selected</span>
@@ -1227,26 +1219,29 @@ export default function Admin() {
                     <RefreshCw className="w-10 h-10 animate-spin text-slate-400 mx-auto mb-3" />
                     <p className="text-slate-500">Loading businesses...</p>
                   </div>
-                ) : filteredCampaigns.length === 0 ? (
+                ) : validEmailCampaigns.length === 0 ? (
                   <div className="text-center py-16">
                     <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="text-lg text-slate-500">{campaigns.length === 0 ? 'No businesses found' : 'No businesses match the filter'}</p>
-                    <p className="text-sm text-slate-400 mt-1">{campaigns.length === 0 ? 'Business data will appear here' : 'Try changing the filter'}</p>
+                    <p className="text-lg text-slate-500">{campaigns.filter(c => getEmailIssue(c.businessEmail) === null).length === 0 ? 'No businesses found' : 'No businesses match the filter'}</p>
+                    <p className="text-sm text-slate-400 mt-1">{campaigns.filter(c => getEmailIssue(c.businessEmail) === null).length === 0 ? 'Business data will appear here' : 'Try changing the filter'}</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-slate-50 hover:bg-slate-50">
-                          <TableHead className="w-[40px]">
-                            <Checkbox 
-                              checked={selectedCampaignIds.size === filteredCampaigns.length && filteredCampaigns.length > 0}
-                              onCheckedChange={(checked) => {
-                                if (checked) handleSelectAll();
-                                else handleDeselectAll();
-                              }}
-                              data-testid="checkbox-select-all"
-                            />
+                        <TableRow className="bg-slate-100/80 hover:bg-slate-100/80 border-b border-slate-200">
+                          <TableHead className="w-[50px] pl-4">
+                            <div className="flex items-center justify-center">
+                              <Checkbox 
+                                checked={selectedCampaignIds.size === validEmailCampaigns.length && validEmailCampaigns.length > 0}
+                                onCheckedChange={(checked) => {
+                                  if (checked) handleSelectAll();
+                                  else handleDeselectAll();
+                                }}
+                                className="border-slate-400"
+                                data-testid="checkbox-select-all"
+                              />
+                            </div>
                           </TableHead>
                           <TableHead className="font-semibold text-slate-700">Business Name</TableHead>
                           <TableHead className="font-semibold text-slate-700 hidden md:table-cell">Location</TableHead>
@@ -1256,19 +1251,21 @@ export default function Admin() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredCampaigns.map((campaign) => (
+                        {validEmailCampaigns.map((campaign) => (
                           <TableRow 
                             key={campaign.id}
-                            className={`cursor-pointer transition-all duration-150 border-b border-slate-100 ${selectedCampaignIds.has(campaign.id) ? 'bg-blue-50/60 hover:bg-blue-100/70' : 'hover:bg-slate-50'}`}
+                            className={`cursor-pointer transition-all duration-200 border-b border-slate-100 ${selectedCampaignIds.has(campaign.id) ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-slate-50/80 hover:shadow-sm'}`}
                             onClick={() => setSelectedCampaign(campaign)}
                             data-testid={`row-campaign-${campaign.id}`}
                           >
-                            <TableCell className="w-[40px] py-4" onClick={(e) => e.stopPropagation()}>
-                              <Checkbox 
-                                checked={selectedCampaignIds.has(campaign.id)}
-                                onCheckedChange={() => toggleCampaignSelection(campaign.id)}
-                                data-testid={`checkbox-campaign-${campaign.id}`}
-                              />
+                            <TableCell className="w-[50px] pl-4 py-4" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-center">
+                                <Checkbox 
+                                  checked={selectedCampaignIds.has(campaign.id)}
+                                  onCheckedChange={() => toggleCampaignSelection(campaign.id)}
+                                  data-testid={`checkbox-campaign-${campaign.id}`}
+                                />
+                              </div>
                             </TableCell>
                             <TableCell className="py-4">
                               <div className="font-medium text-slate-900 max-w-[200px] truncate">{campaign.businessName}</div>
@@ -1328,56 +1325,79 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="submissions" className="space-y-4 mt-0">
+          <TabsContent value="email-issues" className="space-y-4 mt-0">
             <Card className="bg-white border-slate-200">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-medium text-slate-900">Recent Submissions</CardTitle>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <X className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-medium text-slate-900">Businesses with Email Issues</CardTitle>
+                    <p className="text-sm text-slate-500 mt-0.5">These businesses have missing or invalid email addresses</p>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
-                {loadingSubmissions && submissions.length === 0 ? (
+                {loading && emailIssuesCampaigns.length === 0 ? (
                   <div className="text-center py-16">
                     <RefreshCw className="w-10 h-10 animate-spin text-slate-400 mx-auto mb-3" />
-                    <p className="text-slate-500">Loading submissions...</p>
+                    <p className="text-slate-500">Loading...</p>
                   </div>
-                ) : submissions.length === 0 ? (
+                ) : emailIssuesCampaigns.length === 0 ? (
                   <div className="text-center py-16">
-                    <Mail className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="text-lg text-slate-500">No submissions yet</p>
-                    <p className="text-sm text-slate-400 mt-1">New business inquiries will appear here</p>
+                    <Check className="w-12 h-12 mx-auto mb-3 text-emerald-400" />
+                    <p className="text-lg text-slate-500">All businesses have valid emails</p>
+                    <p className="text-sm text-slate-400 mt-1">No email issues found</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-slate-50 hover:bg-slate-50">
-                          <TableHead className="font-semibold text-slate-700">Business Type</TableHead>
-                          <TableHead className="font-semibold text-slate-700">Location</TableHead>
-                          <TableHead className="font-semibold text-slate-700 hidden sm:table-cell">Date</TableHead>
+                        <TableRow className="bg-amber-50/50 hover:bg-amber-50/50 border-b border-amber-100">
+                          <TableHead className="font-semibold text-slate-700">Business Name</TableHead>
+                          <TableHead className="font-semibold text-slate-700 hidden md:table-cell">Location</TableHead>
+                          <TableHead className="font-semibold text-slate-700">Issue</TableHead>
+                          <TableHead className="font-semibold text-slate-700 hidden sm:table-cell">Type</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {submissions.map((submission) => (
-                          <TableRow key={submission.id} data-testid={`row-submission-${submission.id}`}>
-                            <TableCell>
+                        {emailIssuesCampaigns.map((campaign) => (
+                          <TableRow 
+                            key={campaign.id} 
+                            className="cursor-pointer transition-all duration-200 border-b border-slate-100 hover:bg-amber-50/30 hover:shadow-sm"
+                            onClick={() => setSelectedCampaign(campaign)}
+                            data-testid={`row-email-issue-${campaign.id}`}
+                          >
+                            <TableCell className="py-4">
                               <div className="flex items-center gap-2">
-                                <Building2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                                <span className="font-medium text-slate-900">{submission.businessType}</span>
+                                <Building2 className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                                <span className="font-medium text-slate-900 max-w-[200px] truncate">{campaign.businessName}</span>
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1.5 text-slate-600 text-sm">
-                                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                                <span>{submission.city}, {submission.province}, {submission.country}</span>
+                            <TableCell className="hidden md:table-cell py-4">
+                              <div className="flex items-center gap-1.5 text-slate-500 text-sm">
+                                <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                <span className="truncate max-w-[150px]">{extractCityCountry(campaign.address) || '-'}</span>
                               </div>
                             </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <span className="text-sm text-slate-500">
-                                {new Date(submission.createdAt).toLocaleDateString('en-US', { 
-                                  month: 'short', 
-                                  day: 'numeric', 
-                                  year: 'numeric'
-                                })}
-                              </span>
+                            <TableCell className="py-4">
+                              <div className="flex items-center gap-2">
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs bg-amber-50 text-amber-700 border-amber-200"
+                                >
+                                  {getEmailIssueLabel(getEmailIssue(campaign.businessEmail))}
+                                </Badge>
+                                {campaign.businessEmail && campaign.businessEmail.trim() !== '' && (
+                                  <span className="text-slate-400 text-xs truncate max-w-[120px] hidden lg:inline" title={campaign.businessEmail}>
+                                    {campaign.businessEmail}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell py-4">
+                              {getBusinessTypeBadge(campaign)}
                             </TableCell>
                           </TableRow>
                         ))}
