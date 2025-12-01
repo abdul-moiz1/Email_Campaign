@@ -105,10 +105,12 @@ function getAllValidEmails(email: string | undefined): string[] {
 function extractCityCountry(address: string | undefined): string {
   if (!address) return '';
   const parts = address.split(',').map(p => p.trim());
-  if (parts.length >= 2) {
+  // Format is: street, city, province postal, country
+  // Extract city (index 1) and country (last index)
+  if (parts.length >= 3) {
+    const city = parts[1];
     const country = parts[parts.length - 1];
-    const cityPart = parts.length >= 3 ? parts[parts.length - 3] : parts[0];
-    return `${cityPart}, ${country}`;
+    return `${city}, ${country}`;
   }
   return address;
 }
