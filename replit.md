@@ -231,10 +231,10 @@ generatedEmails/
 - Synchronized selectedCampaign state with campaigns array to keep dialog content fresh
 - Toast notifications show clear status: "Generating email..." → "Email generated!" or timeout warning
 
-### Submission Trends Analytics (Dec 1, 2025)
-- Added line chart to admin dashboard displaying daily submission trends
-- Shows zigzag pattern based on actual campaign creation dates
-- Replaced Business Categories card with Submission Trends visualization
-- Chart groups campaigns by date (M/D format) and displays count per day
-- Interactive tooltips show detailed submission counts on hover
-- Data processing optimized using useMemo for performance
+### Email Status Analytics (Dec 1, 2025)
+- Replaced Business Categories card with Email Status pie chart visualization
+- Shows breakdown of generated vs not-generated emails
+- Displays two segments: Generated (blue) and Not Generated (gray)
+- Interactive tooltips show detailed email counts on hover
+- Side legend shows both segments with color indicators
+- Complements the Business Types pie chart for comprehensive dashboard overview

@@ -390,45 +390,6 @@ export default function Admin() {
     }
   }, [campaigns]);
 
-  // Compute submission trends data
-  const submissionTrendsData = useMemo(() => {
-    const grouped: { [key: string]: number } = {};
-    
-    campaigns.forEach((campaign) => {
-      try {
-        // Handle both Date objects and Firestore Timestamp objects
-        let dateObj: Date;
-        const createdAt = campaign.createdAt as any;
-        
-        if (createdAt instanceof Date) {
-          dateObj = createdAt;
-        } else if (typeof createdAt === 'object' && createdAt !== null && typeof createdAt.toDate === 'function') {
-          // Firestore Timestamp
-          dateObj = createdAt.toDate();
-        } else if (typeof createdAt === 'string') {
-          dateObj = new Date(createdAt);
-        } else {
-          dateObj = new Date();
-        }
-        
-        const key = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
-        grouped[key] = (grouped[key] || 0) + 1;
-      } catch (err) {
-        console.error('Error parsing date:', campaign.createdAt, err);
-      }
-    });
-    
-    const result = Object.entries(grouped)
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => {
-        const [aM, aD] = a.date.split('/').map(Number);
-        const [bM, bD] = b.date.split('/').map(Number);
-        return aM - bM || aD - bD;
-      });
-    
-    console.log('Submission trends data:', result);
-    return result;
-  }, [campaigns]);
 
   const getSelectedProduct = (campaignId: string): string => {
     const selected = selectedProducts[campaignId];
@@ -1064,59 +1025,69 @@ export default function Admin() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2 bg-white border-slate-200">
+          <Card className="lg:col-span-1 bg-white border-slate-200">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium text-slate-900 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-slate-500" />
-                Submission Trends
+                <Mail className="w-4 h-4 text-slate-500" />
+                Email Status
               </CardTitle>
             </CardHeader>
             <CardContent>
               {campaigns.length > 0 ? (
-                <div className="h-[280px]">
+                <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={submissionTrendsData}
-                      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                    >
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="#cbd5e1"
-                        style={{ fontSize: '12px' }}
-                      />
-                      <YAxis 
-                        stroke="#cbd5e1"
-                        style={{ fontSize: '12px' }}
-                      />
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Generated', value: emailStats.withEmail, color: '#3b82f6' },
+                          { name: 'Not Generated', value: campaigns.length - emailStats.withEmail, color: '#cbd5e1' }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Generated', value: emailStats.withEmail, color: '#3b82f6' },
+                          { name: 'Not Generated', value: campaigns.length - emailStats.withEmail, color: '#cbd5e1' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
                       <ChartTooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
+                            const data = payload[0].payload;
                             return (
                               <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
-                                <p className="text-sm font-medium text-slate-900">{payload[0].payload.date}</p>
-                                <p className="text-sm text-blue-600">{payload[0].value} submissions</p>
+                                <p className="text-sm font-medium" style={{ color: data.color }}>{data.name}</p>
+                                <p className="text-sm text-slate-600">{data.value} emails</p>
                               </div>
                             );
                           }
                           return null;
                         }}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke="#3b82f6" 
-                        dot={{ fill: '#3b82f6', r: 4 }}
-                        activeDot={{ r: 6 }}
-                        strokeWidth={2}
-                      />
-                    </LineChart>
+                    </PieChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="h-[280px] flex items-center justify-center text-slate-400 text-sm">
+                <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
                   No data to display
                 </div>
               )}
+              <div className="mt-2 flex flex-wrap gap-2 justify-center">
+                <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
+                  <span>Generated</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#cbd5e1' }} />
+                  <span>Not Generated</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </motion.div>
