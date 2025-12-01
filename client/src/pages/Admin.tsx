@@ -1068,7 +1068,6 @@ export default function Admin() {
                 <BarChart3 className="w-4 h-4 text-slate-500" />
                 Email Trends (by date)
               </CardTitle>
-              <p className="text-xs text-slate-500 mt-1">Zigzag appears when emails span multiple dates</p>
             </CardHeader>
             <CardContent>
               {campaigns.length > 0 ? (
