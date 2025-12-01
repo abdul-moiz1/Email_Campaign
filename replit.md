@@ -225,6 +225,15 @@ generatedEmails/
 
 ## Recent Features & Improvements
 
+### Admin Dashboard UI Improvements (Dec 1, 2025)
+- Added separate "Email Issues" tab for businesses with missing/invalid email addresses
+- Moved email issue filtering logic to dedicated tab for cleaner data separation
+- Business type badges now use muted slate colors (bg-slate-100 text-slate-600) distinct from status badges
+- Enhanced table row hover effects with smooth transitions and subtle shadow
+- Improved checkbox centering in table headers
+- Separated campaigns into validEmailCampaigns and emailIssuesCampaigns memos for clean partitioning
+- Removed old submissions tab (functionality moved to email issues tab)
+
 ### Invalid/Missing Email Filter & Manual Correction (Dec 1, 2025)
 - Added "Invalid/Missing Email" filter option to identify businesses with email problems
 - Email validation categorizes issues: missing, invalid format, contains URL, starts with @
