@@ -231,10 +231,10 @@ generatedEmails/
 - Synchronized selectedCampaign state with campaigns array to keep dialog content fresh
 - Toast notifications show clear status: "Generating email..." → "Email generated!" or timeout warning
 
-### Email Status Analytics (Dec 1, 2025)
-- Replaced Business Categories card with Email Status pie chart visualization
-- Shows breakdown of generated vs not-generated emails
-- Displays two segments: Generated (blue) and Not Generated (gray)
-- Interactive tooltips show detailed email counts on hover
-- Side legend shows both segments with color indicators
+### Email Trends Analytics (Dec 1, 2025)
+- Replaced Business Categories card with Email Trends line chart
+- Shows emails generated over time by date
+- Displays daily email generation count with blue line and dots
+- X-axis shows dates (M/D format), Y-axis shows email count
+- Interactive tooltips show detailed email count on hover
 - Complements the Business Types pie chart for comprehensive dashboard overview
