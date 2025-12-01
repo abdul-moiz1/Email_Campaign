@@ -1028,19 +1028,19 @@ export default function Admin() {
             <Card className="bg-white border-slate-200">
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <Input
-                        placeholder="Search businesses..."
-                        value={searchKeyword}
-                        onChange={(e) => setSearchKeyword(e.target.value)}
-                        className="pl-9 w-[200px] sm:w-[280px]"
-                        data-testid="input-search-keyword"
-                      />
-                    </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      placeholder="Search businesses..."
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      className="pl-9 w-[200px] sm:w-[280px]"
+                      data-testid="input-search-keyword"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
                     <Select value={filterMode} onValueChange={(value: FilterMode) => setFilterMode(value)}>
-                      <SelectTrigger className="w-[140px]" data-testid="select-filter-mode">
+                      <SelectTrigger className="w-[130px]" data-testid="select-filter-mode">
                         <SelectValue placeholder="Filter" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1050,13 +1050,11 @@ export default function Admin() {
                         <SelectItem value="sent">Sent</SelectItem>
                       </SelectContent>
                     </Select>
-                    <span className="text-sm text-slate-500 hidden sm:inline">
-                      Showing {filteredCampaigns.length} of {campaigns.length}
+                    <span className="text-sm text-slate-500">
+                      {filteredCampaigns.length} of {campaigns.length}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-2">
                     {selectedCampaignIds.size > 0 && (
-                      <span className="text-sm text-slate-500">{selectedCampaignIds.size} selected</span>
+                      <span className="text-sm text-blue-600 font-medium">{selectedCampaignIds.size} selected</span>
                     )}
                     {sendableSelectedCount > 0 && (
                       <Button
