@@ -1002,7 +1002,7 @@ export default function Admin() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6"
         >
           <Card className="lg:col-span-1 bg-white border-slate-200">
             <CardHeader className="pb-2">
@@ -1066,8 +1066,9 @@ export default function Admin() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium text-slate-900 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-slate-500" />
-                Email Trends
+                Email Trends (by date)
               </CardTitle>
+              <p className="text-xs text-slate-500 mt-1">Zigzag appears when emails span multiple dates</p>
             </CardHeader>
             <CardContent>
               {campaigns.length > 0 ? (
