@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Sparkles, Save, Star, Plus, Search, LogOut, Eye, PieChart as PieChartIcon, Users, BarChart3 } from "lucide-react";
+import { Check, X, Building2, Clock, ArrowLeft, RefreshCw, MapPin, Mail, ExternalLink, Send, Phone, Sparkles, Save, Star, Plus, Search, LogOut, PieChart as PieChartIcon, Users, BarChart3 } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -1111,14 +1111,13 @@ export default function Admin() {
                           <TableHead className="font-semibold text-slate-700 hidden lg:table-cell">Email</TableHead>
                           <TableHead className="font-semibold text-slate-700 hidden sm:table-cell">Type</TableHead>
                           <TableHead className="font-semibold text-slate-700">Status</TableHead>
-                          <TableHead className="font-semibold text-slate-700 text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredCampaigns.map((campaign) => (
                           <TableRow 
                             key={campaign.id}
-                            className={`cursor-pointer transition-colors border-b border-slate-100 ${selectedCampaignIds.has(campaign.id) ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50/50'}`}
+                            className={`cursor-pointer transition-all duration-150 border-b border-slate-100 ${selectedCampaignIds.has(campaign.id) ? 'bg-blue-50/60 hover:bg-blue-100/70' : 'hover:bg-slate-50'}`}
                             onClick={() => setSelectedCampaign(campaign)}
                             data-testid={`row-campaign-${campaign.id}`}
                           >
@@ -1163,31 +1162,6 @@ export default function Admin() {
                             </TableCell>
                             <TableCell className="py-4">
                               {getEmailBadge(campaign)}
-                            </TableCell>
-                            <TableCell className="text-right py-4">
-                              <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                                {campaign.hasEmail && hasEmailContent(campaign.email) && (
-                                  <Button
-                                    onClick={(e) => { e.stopPropagation(); campaign.email && openEmailModal(campaign.email); }}
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-slate-600 hover:text-slate-900"
-                                    data-testid={`button-view-email-${campaign.id}`}
-                                  >
-                                    <Mail className="w-4 h-4 mr-1.5" />
-                                    <span className="hidden sm:inline">View</span>
-                                  </Button>
-                                )}
-                                <Button
-                                  onClick={(e) => { e.stopPropagation(); setSelectedCampaign(campaign); }}
-                                  size="icon"
-                                  variant="ghost"
-                                  className="text-slate-400 hover:text-slate-600"
-                                  data-testid={`button-details-${campaign.id}`}
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
