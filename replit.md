@@ -204,6 +204,7 @@ generatedEmails/
 - Lucide React icons for consistent iconography
 - cmdk for command palette components
 - Embla Carousel for carousel functionality
+- Recharts for data visualization (pie charts, line charts)
 
 **Form & Validation**
 - Zod for runtime schema validation
@@ -221,3 +222,19 @@ generatedEmails/
 - Application designed to run on Replit platform
 - Meta image plugin updates OpenGraph tags with Replit deployment URLs
 - Environment detection via `REPL_ID` variable
+
+## Recent Features & Improvements
+
+### Email Generation Auto-Polling (Dec 1, 2025)
+- Implemented automatic polling (3-second intervals, 60-second timeout) when generating emails via Make.com webhook
+- Dialog automatically updates when email is generated without requiring manual refresh
+- Synchronized selectedCampaign state with campaigns array to keep dialog content fresh
+- Toast notifications show clear status: "Generating email..." → "Email generated!" or timeout warning
+
+### Submission Trends Analytics (Dec 1, 2025)
+- Added line chart to admin dashboard displaying daily submission trends
+- Shows zigzag pattern based on actual campaign creation dates
+- Replaced Business Categories card with Submission Trends visualization
+- Chart groups campaigns by date (M/D format) and displays count per day
+- Interactive tooltips show detailed submission counts on hover
+- Data processing optimized using useMemo for performance

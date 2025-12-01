@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, LineChart, Line, XAxis, YAxis } from "recharts";
 import { productTypes, type ProductType, type EmailStatus } from "@shared/schema";
 
 type FilterMode = 'all' | 'withEmail' | 'withoutEmail' | 'sent';
@@ -388,6 +388,23 @@ export default function Admin() {
         }
       }
     }
+  }, [campaigns]);
+
+  // Compute submission trends data
+  const submissionTrendsData = useMemo(() => {
+    const grouped: { [key: string]: number } = {};
+    campaigns.forEach((campaign) => {
+      const date = new Date(campaign.createdAt || Date.now());
+      const key = `${date.getMonth() + 1}/${date.getDate()}`;
+      grouped[key] = (grouped[key] || 0) + 1;
+    });
+    return Object.entries(grouped)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => {
+        const [aM, aD] = a.date.split('/').map(Number);
+        const [bM, bD] = b.date.split('/').map(Number);
+        return aM - bM || aD - bD;
+      });
   }, [campaigns]);
 
   const getSelectedProduct = (campaignId: string): string => {
@@ -1027,50 +1044,55 @@ export default function Admin() {
           <Card className="lg:col-span-2 bg-white border-slate-200">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium text-slate-900 flex items-center gap-2">
-                <Users className="w-4 h-4 text-slate-500" />
-                Business Categories
+                <BarChart3 className="w-4 h-4 text-slate-500" />
+                Submission Trends
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {Object.entries(businessTypeStats)
-                  .filter(([key]) => key !== 'all')
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([type, value]) => (
-                    <button
-                      key={type}
-                      onClick={() => setBusinessTypeFilter(type)}
-                      className={`p-3 rounded-lg border transition-all text-left ${
-                        businessTypeFilter === type 
-                          ? 'border-blue-500 bg-blue-50' 
-                          : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                      }`}
-                      data-testid={`filter-type-${type.toLowerCase().replace(/\s+/g, '-')}`}
+              {campaigns.length > 0 ? (
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={submissionTrendsData}
+                      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: getBusinessTypeColor(type, uniqueBusinessTypes) }} 
-                        />
-                        <span className="text-xs font-medium text-slate-600">
-                          {type}
-                        </span>
-                      </div>
-                      <div className="text-xl font-bold text-slate-900">{value}</div>
-                    </button>
-                  ))}
-              </div>
-              {businessTypeFilter !== 'all' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setBusinessTypeFilter('all')}
-                  className="mt-3 text-slate-500"
-                  data-testid="button-clear-type-filter"
-                >
-                  <X className="w-3 h-3 mr-1" />
-                  Clear filter
-                </Button>
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="#cbd5e1"
+                        style={{ fontSize: '12px' }}
+                      />
+                      <YAxis 
+                        stroke="#cbd5e1"
+                        style={{ fontSize: '12px' }}
+                      />
+                      <ChartTooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-lg">
+                                <p className="text-sm font-medium text-slate-900">{payload[0].payload.date}</p>
+                                <p className="text-sm text-blue-600">{payload[0].value} submissions</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="#3b82f6" 
+                        dot={{ fill: '#3b82f6', r: 4 }}
+                        activeDot={{ r: 6 }}
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-[280px] flex items-center justify-center text-slate-400 text-sm">
+                  No data to display
+                </div>
               )}
             </CardContent>
           </Card>
